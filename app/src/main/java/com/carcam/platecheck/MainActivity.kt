@@ -25,7 +25,6 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,7 +32,8 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
     private lateinit var cameraExecutor: ExecutorService
     private val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
-    private val isProcessing = AtomicBoolean(false)
+    // 동시에 처리 중인 프레임 수 (최대 2)
+    private val activeJobs = java.util.concurrent.atomic.AtomicInteger(0)
 
     // 최근 인식 번호판 (최신순, 최대 5개)
     private val recentPlates = ArrayDeque<String>()
@@ -55,7 +55,8 @@ class MainActivity : AppCompatActivity() {
             binding.tvRecent4, binding.tvRecent5
         )
 
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        // 스레드 2개: 한 프레임 처리 중에도 다음 프레임 바로 시작
+        cameraExecutor = Executors.newFixedThreadPool(2)
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
@@ -111,7 +112,7 @@ class MainActivity : AppCompatActivity() {
                 it.setSurfaceProvider(binding.previewView.surfaceProvider)
             }
             val imageAnalyzer = ImageAnalysis.Builder()
-                .setTargetResolution(Size(1280, 720))
+                .setTargetResolution(Size(640, 480)) // 번호판은 굵은 글씨 → 저해상도도 충분
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also { analysis ->
@@ -146,22 +147,39 @@ class MainActivity : AppCompatActivity() {
 
     @androidx.camera.core.ExperimentalGetImage
     private fun processImage(imageProxy: ImageProxy) {
-        // AtomicBoolean으로 중복 처리 방지 (lock-free)
-        if (!isProcessing.compareAndSet(false, true)) {
+        // 동시 처리 2개 초과 시 스킵 (최신 프레임 우선)
+        if (activeJobs.get() >= 2) {
             imageProxy.close()
             return
         }
-        val mediaImage = imageProxy.image ?: run {
-            isProcessing.set(false)
-            imageProxy.close()
-            return
-        }
+        val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
 
         val imgWidth = imageProxy.width
         val imgHeight = imageProxy.height
         val rotation = imageProxy.imageInfo.rotationDegrees
-        val image = InputImage.fromMediaImage(mediaImage, rotation)
 
+        // Y 평면(그레이스케일)만 추출 → 컬러 디코딩 생략으로 처리 속도 향상
+        val yPlane = mediaImage.planes[0]
+        val yBuffer = yPlane.buffer
+        val yRowStride = yPlane.rowStride
+        val yPixelStride = yPlane.pixelStride
+
+        // NV21 포맷으로 감싸기 (UV는 0으로 채워 그레이스케일 효과)
+        val nv21 = ByteArray(imgWidth * imgHeight * 3 / 2)
+        if (yPixelStride == 1 && yRowStride == imgWidth) {
+            yBuffer.get(nv21, 0, imgWidth * imgHeight)
+        } else {
+            // row stride가 다를 경우 행별로 복사
+            for (row in 0 until imgHeight) {
+                yBuffer.position(row * yRowStride)
+                yBuffer.get(nv21, row * imgWidth, imgWidth)
+            }
+        }
+        // UV 영역은 이미 0(128,128 중립)으로 초기화되어 있음
+
+        val image = InputImage.fromByteArray(nv21, imgWidth, imgHeight, rotation, InputImage.IMAGE_FORMAT_NV21)
+
+        activeJobs.incrementAndGet()
         recognizer.process(image)
             .addOnSuccessListener { visionText ->
                 val plateBoxes = mutableListOf<Pair<Rect, String>>()
@@ -182,7 +200,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .addOnCompleteListener {
-                isProcessing.set(false)
+                activeJobs.decrementAndGet()
                 imageProxy.close()
             }
     }
