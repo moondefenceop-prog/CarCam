@@ -41,7 +41,9 @@ class MainActivity : AppCompatActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted -> if (granted) startCamera() else finish() }
+    ) { granted ->
+        if (granted) binding.previewView.post { startCamera() } else finish()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +60,8 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
         ) {
-            startCamera()
+            // PreviewView가 레이아웃된 후 ViewPort가 생성되므로 post로 지연 실행
+            binding.previewView.post { startCamera() }
         } else {
             permissionLauncher.launch(Manifest.permission.CAMERA)
         }
@@ -107,7 +110,6 @@ class MainActivity : AppCompatActivity() {
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(binding.previewView.surfaceProvider)
             }
-            // 해상도를 낮춰 OCR 속도 향상
             val imageAnalyzer = ImageAnalysis.Builder()
                 .setTargetResolution(Size(1280, 720))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -119,9 +121,23 @@ class MainActivity : AppCompatActivity() {
                 }
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalyzer
-                )
+                // ViewPort로 Preview와 ImageAnalysis가 완전히 동일한 화면 영역을 공유
+                // → 화면 어느 위치에 번호판이 있어도 동일하게 인식 및 박스 정렬
+                val viewPort = binding.previewView.viewPort
+                if (viewPort != null) {
+                    val useCaseGroup = UseCaseGroup.Builder()
+                        .addUseCase(preview)
+                        .addUseCase(imageAnalyzer)
+                        .setViewPort(viewPort)
+                        .build()
+                    cameraProvider.bindToLifecycle(
+                        this, CameraSelector.DEFAULT_BACK_CAMERA, useCaseGroup
+                    )
+                } else {
+                    cameraProvider.bindToLifecycle(
+                        this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalyzer
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("CarCam", "Camera bind failed", e)
             }
