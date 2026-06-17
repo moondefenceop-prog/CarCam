@@ -3,6 +3,7 @@ package com.carcam.platecheck
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
@@ -43,7 +44,8 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            == PackageManager.PERMISSION_GRANTED) {
+            == PackageManager.PERMISSION_GRANTED
+        ) {
             startCamera()
         } else {
             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -64,19 +66,21 @@ class MainActivity : AppCompatActivity() {
                 if (result.isRegistered) {
                     binding.tvStatus.text = "✅ 등록 차량"
                     binding.tvStatus.setBackgroundColor(
-                        ContextCompat.getColor(this, R.color.registered_green))
+                        ContextCompat.getColor(this, R.color.registered_green)
+                    )
                 } else {
                     binding.tvStatus.text = "❌ 미등록 차량"
                     binding.tvStatus.setBackgroundColor(
-                        ContextCompat.getColor(this, R.color.not_registered_red))
+                        ContextCompat.getColor(this, R.color.not_registered_red)
+                    )
                 }
-                if (result.note.isNotEmpty()) {
-                    binding.tvNote.text = result.note
-                    binding.tvNote.isVisible = true
-                } else {
-                    binding.tvNote.isVisible = false
-                }
-                binding.resultCard.postDelayed({ viewModel.clearResult() }, 3000)
+                binding.tvNote.isVisible = result.note.isNotEmpty()
+                if (result.note.isNotEmpty()) binding.tvNote.text = result.note
+
+                binding.resultCard.postDelayed({
+                    viewModel.clearResult()
+                    binding.plateOverlay.clear()
+                }, 3000)
             }
         }
     }
@@ -112,11 +116,32 @@ class MainActivity : AppCompatActivity() {
         if (isProcessing) { imageProxy.close(); return }
         val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
         isProcessing = true
+
+        val imgWidth = imageProxy.width
+        val imgHeight = imageProxy.height
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+
         recognizer.process(image)
-            .addOnSuccessListener { result ->
-                val plate = KoreanPlateRecognizer.extractPlateNumber(result.text)
-                if (plate != null) viewModel.checkPlate(plate)
+            .addOnSuccessListener { visionText ->
+                // 전체 텍스트 블록에서 번호판 패턴 탐색
+                val plateBoxes = mutableListOf<Pair<Rect, String>>()
+                for (block in visionText.textBlocks) {
+                    val candidate = KoreanPlateRecognizer.extractPlateNumber(block.text)
+                    if (candidate != null) {
+                        block.boundingBox?.let { box ->
+                            plateBoxes.add(Pair(box, candidate))
+                        }
+                        viewModel.checkPlate(candidate)
+                    }
+                }
+                // 오버레이 업데이트는 메인 스레드에서
+                runOnUiThread {
+                    if (plateBoxes.isNotEmpty()) {
+                        binding.plateOverlay.setPlateBoxes(plateBoxes, imgWidth, imgHeight)
+                    } else {
+                        binding.plateOverlay.clear()
+                    }
+                }
             }
             .addOnCompleteListener {
                 isProcessing = false
