@@ -34,8 +34,8 @@ class MainActivity : AppCompatActivity() {
     private val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
     private val activeJobs = java.util.concurrent.atomic.AtomicInteger(0)
 
-    // 안정화: 같은 번호판이 연속 N프레임 나와야 확정 출력
-    private val CONFIRM_THRESHOLD = 2
+    // 안정화: 1프레임만 보여도 즉시 표시 (인식률 우선)
+    private val CONFIRM_THRESHOLD = 1
     private val plateConfirmCount = mutableMapOf<String, Int>()
     private var confirmedPlate: String? = null
 
@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
                 it.setSurfaceProvider(binding.previewView.surfaceProvider)
             }
             val imageAnalyzer = ImageAnalysis.Builder()
-                .setTargetResolution(Size(640, 480)) // 번호판은 굵은 글씨 → 저해상도도 충분
+                .setTargetResolution(Size(960, 540)) // 한글 인식률과 속도의 균형점
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also { analysis ->
@@ -160,37 +160,14 @@ class MainActivity : AppCompatActivity() {
 
     @androidx.camera.core.ExperimentalGetImage
     private fun processImage(imageProxy: ImageProxy) {
-        // 동시 처리 2개 초과 시 스킵 (최신 프레임 우선)
-        if (activeJobs.get() >= 2) {
-            imageProxy.close()
-            return
-        }
+        if (activeJobs.get() >= 2) { imageProxy.close(); return }
         val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
 
         val imgWidth = imageProxy.width
         val imgHeight = imageProxy.height
         val rotation = imageProxy.imageInfo.rotationDegrees
-
-        // Y 평면(그레이스케일)만 추출 → 컬러 디코딩 생략으로 처리 속도 향상
-        val yPlane = mediaImage.planes[0]
-        val yBuffer = yPlane.buffer
-        val yRowStride = yPlane.rowStride
-        val yPixelStride = yPlane.pixelStride
-
-        // NV21 포맷으로 감싸기 (UV는 0으로 채워 그레이스케일 효과)
-        val nv21 = ByteArray(imgWidth * imgHeight * 3 / 2)
-        if (yPixelStride == 1 && yRowStride == imgWidth) {
-            yBuffer.get(nv21, 0, imgWidth * imgHeight)
-        } else {
-            // row stride가 다를 경우 행별로 복사
-            for (row in 0 until imgHeight) {
-                yBuffer.position(row * yRowStride)
-                yBuffer.get(nv21, row * imgWidth, imgWidth)
-            }
-        }
-        // UV 영역은 이미 0(128,128 중립)으로 초기화되어 있음
-
-        val image = InputImage.fromByteArray(nv21, imgWidth, imgHeight, rotation, InputImage.IMAGE_FORMAT_NV21)
+        // 컬러 원본 사용 → ML Kit 한국어 모델 최대 정확도
+        val image = InputImage.fromMediaImage(mediaImage, rotation)
 
         activeJobs.incrementAndGet()
         recognizer.process(image)
