@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
-import com.google.mlkit.vision.text.Text
 
 class PlateOverlayView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -35,39 +34,23 @@ class PlateOverlayView @JvmOverloads constructor(
         imgHeight: Int,
         rotationDegrees: Int
     ) {
-        // Build transform matrix: rotate original image coords → screen coords
-        val matrix = Matrix()
-        when (rotationDegrees) {
-            90 -> {
-                matrix.postRotate(90f)
-                matrix.postTranslate(imgHeight.toFloat(), 0f)
-            }
-            180 -> {
-                matrix.postRotate(180f)
-                matrix.postTranslate(imgWidth.toFloat(), imgHeight.toFloat())
-            }
-            270 -> {
-                matrix.postRotate(270f)
-                matrix.postTranslate(0f, imgWidth.toFloat())
-            }
-        }
-        // Logical (display) dimensions after rotation
+        // ML Kit already returns bounding boxes in display-oriented space (rotation applied).
+        // Only need to scale from the rotated image dimensions to view dimensions.
         val logicalW = if (rotationDegrees == 90 || rotationDegrees == 270) imgHeight.toFloat() else imgWidth.toFloat()
         val logicalH = if (rotationDegrees == 90 || rotationDegrees == 270) imgWidth.toFloat() else imgHeight.toFloat()
-        matrix.postScale(width / logicalW, height / logicalH)
+        val scaleX = width / logicalW
+        val scaleY = height / logicalH
 
         plateBoxes = boxes.map { (rect, text) ->
-            // Map all 4 corners to handle rotation-induced axis flips
-            val pts = floatArrayOf(
-                rect.left.toFloat(),  rect.top.toFloat(),
-                rect.right.toFloat(), rect.top.toFloat(),
-                rect.right.toFloat(), rect.bottom.toFloat(),
-                rect.left.toFloat(),  rect.bottom.toFloat()
+            Pair(
+                RectF(
+                    rect.left   * scaleX,
+                    rect.top    * scaleY,
+                    rect.right  * scaleX,
+                    rect.bottom * scaleY
+                ),
+                text
             )
-            matrix.mapPoints(pts)
-            val xs = floatArrayOf(pts[0], pts[2], pts[4], pts[6])
-            val ys = floatArrayOf(pts[1], pts[3], pts[5], pts[7])
-            Pair(RectF(xs.min(), ys.min(), xs.max(), ys.max()), text)
         }
         invalidate()
     }
