@@ -25,13 +25,55 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- 최근 인식 목록 (상단 우측) -->
+    <LinearLayout
+        android:id="@+id/recentListContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_margin="12dp"
+        android:padding="8dp"
+        android:background="@color/overlay_bg"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="최근 인식"
+            android:textColor="#AAAAAA"
+            android:textSize="11sp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView android:id="@+id/tvRecent1"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/white" android:textSize="13sp"
+            android:fontFamily="monospace" android:visibility="gone" />
+        <TextView android:id="@+id/tvRecent2"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/white" android:textSize="13sp"
+            android:fontFamily="monospace" android:visibility="gone" />
+        <TextView android:id="@+id/tvRecent3"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/white" android:textSize="13sp"
+            android:fontFamily="monospace" android:visibility="gone" />
+        <TextView android:id="@+id/tvRecent4"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/white" android:textSize="13sp"
+            android:fontFamily="monospace" android:visibility="gone" />
+        <TextView android:id="@+id/tvRecent5"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/white" android:textSize="13sp"
+            android:fontFamily="monospace" android:visibility="gone" />
+    </LinearLayout>
+
     <!-- 결과 카드 -->
     <androidx.cardview.widget.CardView
         android:id="@+id/resultCard"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="100dp"
+        android:layout_marginBottom="88dp"
         app:cardCornerRadius="12dp"
         app:cardElevation="8dp"
         app:layout_constraintBottom_toTopOf="@id/btnPlateList"
@@ -52,6 +94,7 @@
                 android:textSize="28sp"
                 android:textStyle="bold"
                 android:textColor="@color/black"
+                android:fontFamily="monospace"
                 android:letterSpacing="0.1" />
 
             <TextView
@@ -79,11 +122,11 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnPlateList"
         android:layout_width="0dp"
-        android:layout_height="56dp"
+        android:layout_height="52dp"
         android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="12dp"
         android:text="등록 차량 목록 관리"
-        android:textSize="16sp"
+        android:textSize="15sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -94,13 +137,13 @@
         android:layout_height="wrap_content"
         android:text="자동 번호판 인식 중..."
         android:textColor="@color/white"
-        android:textSize="14sp"
+        android:textSize="13sp"
         android:background="@color/overlay_bg"
-        android:paddingHorizontal="12dp"
+        android:paddingHorizontal="10dp"
         android:paddingVertical="4dp"
         android:visibility="visible"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_margin="16dp" />
+        android:layout_margin="12dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
