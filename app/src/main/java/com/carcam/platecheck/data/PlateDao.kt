@@ -11,6 +11,9 @@ interface PlateDao {
     @Query("SELECT * FROM plates WHERE plateNumber = :plateNumber LIMIT 1")
     suspend fun findByNumber(plateNumber: String): PlateEntity?
 
+    @Query("SELECT * FROM plates")
+    suspend fun getAllPlatesOnce(): List<PlateEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(plate: PlateEntity)
 
