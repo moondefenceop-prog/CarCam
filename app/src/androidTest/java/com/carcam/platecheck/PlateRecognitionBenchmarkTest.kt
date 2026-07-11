@@ -153,9 +153,9 @@ class PlateRecognitionBenchmarkTest {
                 val candidates = PlateOcrEngine.extractPlates(visionText).map { it.second }
                 val expectedDigits = KoreanPlateRecognizer.digitsOnly(expected)
                 val exactMatch = candidates.contains(expected)
-                val digitMatch = exactMatch || candidates.any { KoreanPlateRecognizer.digitsOnly(it) == expectedDigits }
+                val digitMatch = exactMatch || candidates.any { KoreanPlateRecognizer.candidateDigitKeys(it).contains(expectedDigits) }
                 val actual = candidates.firstOrNull { it == expected }
-                    ?: candidates.firstOrNull { KoreanPlateRecognizer.digitsOnly(it) == expectedDigits }
+                    ?: candidates.firstOrNull { KoreanPlateRecognizer.candidateDigitKeys(it).contains(expectedDigits) }
                     ?: candidates.firstOrNull()
                 val rawText = visionText.text.replace("\n", "|")
 
@@ -225,9 +225,9 @@ class PlateRecognitionBenchmarkTest {
 
                 val expectedDigits = KoreanPlateRecognizer.digitsOnly(expected)
                 val exactMatch = candidates.contains(expected)
-                val digitMatch = exactMatch || candidates.any { KoreanPlateRecognizer.digitsOnly(it) == expectedDigits }
+                val digitMatch = exactMatch || candidates.any { KoreanPlateRecognizer.candidateDigitKeys(it).contains(expectedDigits) }
                 val actual = candidates.firstOrNull { it == expected }
-                    ?: candidates.firstOrNull { KoreanPlateRecognizer.digitsOnly(it) == expectedDigits }
+                    ?: candidates.firstOrNull { KoreanPlateRecognizer.candidateDigitKeys(it).contains(expectedDigits) }
                     ?: candidates.firstOrNull()
 
                 results.add(CaseResult(file, expected, actual, exactMatch, digitMatch, latency, rawText))

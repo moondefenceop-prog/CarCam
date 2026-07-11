@@ -66,6 +66,45 @@ class KoreanPlateRecognizerTest {
     }
 
     @Test
+    fun `middle Hangul dropped entirely leaves a bare 7-digit run that is still a candidate`() {
+        // "154러7070": ML Kit sometimes swallows "러" whole, returning "1547070".
+        // The bare digit run must survive as a candidate so the digit-key DB lookup can match.
+        val result = KoreanPlateRecognizer.extractPlateNumberLenient("1547070")
+        assertEquals("1547070", result)
+        // Interpretation (a): middle dropped, all 7 digits real — matches 154러7070's key.
+        assert(KoreanPlateRecognizer.candidateDigitKeys(result!!).contains("1547070"))
+    }
+
+    @Test
+    fun `middle Hangul misread as a digit leaves an 8-digit run repaired via key reinterpretation`() {
+        // "154러7070" grayscale read: "러" -> "4", producing "15447070". Dropping the 4th digit
+        // (the misread middle) recovers the true key "1547070".
+        val result = KoreanPlateRecognizer.extractPlateNumberLenient("15447070")
+        assertEquals("15447070", result)
+        assert(KoreanPlateRecognizer.candidateDigitKeys(result!!).contains("1547070"))
+    }
+
+    @Test
+    fun `candidateDigitKeys adds no reinterpretations when scan contains Hangul`() {
+        assertEquals(listOf("569876"), KoreanPlateRecognizer.candidateDigitKeys("56너9876"))
+    }
+
+    @Test
+    fun `phone numbers with separators are not plate candidates`() {
+        // Observed real false positive: "L67-5736" (street sign) used to match with '-' as the
+        // middle character. The middle charset now excludes separators, and the dash also splits
+        // the digits so no 7-8 digit bare run forms.
+        assertNull(KoreanPlateRecognizer.extractPlateNumberLenient("L67-5736"))
+        assertNull(KoreanPlateRecognizer.extractPlateNumberLenient("TEL 627-9336"))
+    }
+
+    @Test
+    fun `digit runs adjacent to more digits are not plate candidates`() {
+        // 9+ consecutive digits can't be a plate reading; lookarounds must reject.
+        assertNull(KoreanPlateRecognizer.extractPlateNumberLenient("123456789"))
+    }
+
+    @Test
     fun `digitsOnly strips everything but digits`() {
         assertEquals("569876", KoreanPlateRecognizer.digitsOnly("56너9876"))
         assertEquals("569876", KoreanPlateRecognizer.digitsOnly("56E9876"))

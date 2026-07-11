@@ -22,12 +22,15 @@ class PlateRepository(context: Context) {
         val trimmed = plateNumber.trim()
         dao.findByNumber(trimmed)?.let { return it }
 
-        val scannedDigits = KoreanPlateRecognizer.digitsOnly(trimmed)
-        if (scannedDigits.length < 6) return null
-        return dao.getAllPlatesOnce().firstOrNull {
-            KoreanPlateRecognizer.digitsOnly(it.plateNumber) == scannedDigits &&
+        // 가운데 한글이 소실/숫자화된 스캔("1547070", "15447070")까지 대조할 수 있도록
+        // 가능한 숫자 키 해석을 모두 시도한다.
+        val keys = KoreanPlateRecognizer.candidateDigitKeys(trimmed)
+        if (keys.first().length < 6) return null
+        return dao.getAllPlatesOnce().firstOrNull { entity ->
+            val entityKey = KoreanPlateRecognizer.digitsOnly(entity.plateNumber)
+            keys.any { it == entityKey } &&
                 // 양쪽 다 유효한 한글로 읽혔는데 글자가 다르면 숫자가 같아도 다른 차량
-                KoreanPlateRecognizer.isMiddleCompatible(trimmed, it.plateNumber)
+                KoreanPlateRecognizer.isMiddleCompatible(trimmed, entity.plateNumber)
         }
     }
 }

@@ -19,10 +19,17 @@ object KoreanPlateRecognizer {
         '하', '허', '호', '배'
     )
 
-    // 앞 2~3자리 숫자 + 가운데 1~3문자(숫자 제외) + 뒤 4자리 숫자.
+    // 앞 2~3자리 숫자 + 가운데 1~3문자 + 뒤 4자리 숫자.
     // 가운데를 한글로 한정하지 않는 이유: 오인식 시 라틴 문자('L', 'Of')나
     // 낱자모(ㄴ)로 읽히는 경우까지 잡아서 교정 단계로 넘기기 위함이다.
-    private val PLATE_SHAPE = Pattern.compile("([0-9]{2,3})([^0-9\\s]{1,3})([0-9]{4})")
+    // 단 한글/자모/라틴만 허용 — '-' 같은 구분 기호까지 허용하면 전화번호("67-5736")가
+    // 번호판으로 오검출되는 것을 실측으로 확인했다.
+    private val PLATE_SHAPE = Pattern.compile("([0-9]{2,3})([가-힣ㄱ-ㅎA-Za-z]{1,3})([0-9]{4})")
+
+    // 가운데 한글이 통째로 소실되거나('러'→없음) 숫자로 오인식된('러'→'4', '조'→'2') 경우
+    // 남는 것은 순수 숫자 7~8자리 연속열이다. 7자리 = 앞3+뒤4(소실) 또는 앞2+오인식1+뒤4,
+    // 8자리 = 앞3+오인식1+뒤4. 좌우에 다른 숫자가 붙어 있으면 번호판이 아니므로 제외한다.
+    private val BARE_DIGIT_RUN = Regex("(?<![0-9])[0-9]{7,8}(?![0-9])")
     // 구형: 숫자2 + 한글2 + 숫자4  예) 12가나1234 (지역명 병기형)
     private val OLD_PATTERN = Pattern.compile("[0-9]{2}[가-힣]{2}[0-9]{4}")
     // 외교/임시 특수번호판
@@ -93,7 +100,26 @@ object KoreanPlateRecognizer {
         // 교정 실패 → 모양만 맞으면 원문 그대로 반환 (표시 + 숫자 기반 DB 대조용)
         val m = PLATE_SHAPE.matcher(jamoFixed)
         if (m.find()) return m.group()
+
+        // 가운데 한글이 소실/숫자화된 경우: 순수 숫자 7~8자리 연속열을 후보로 반환.
+        // DB 조회는 candidateDigitKeys()로 두 해석(소실/오인식)을 모두 대조한다.
+        BARE_DIGIT_RUN.find(cleaned)?.let { return it.value }
         return null
+    }
+
+    // 숫자 기반 DB 대조에 쓸 후보 키 목록. 한글이 하나도 없는(=가운데가 소실/숫자화된) 스캔이면
+    // 7자리는 "가운데 소실(그대로)"과 "앞2+오인식1+뒤4(3번째 제거)" 두 해석을,
+    // 8자리는 "앞3+오인식1+뒤4(4번째 제거)" 해석을 추가로 시도한다.
+    fun candidateDigitKeys(scanned: String): List<String> {
+        val digits = digitsOnly(scanned)
+        val keys = mutableListOf(digits)
+        if (scanned.none { it in '가'..'힣' }) {
+            when (digits.length) {
+                7 -> keys.add(digits.removeRange(2, 3))
+                8 -> keys.add(digits.removeRange(3, 4))
+            }
+        }
+        return keys
     }
 
     // 오인식된 가운데 토큰을 화이트리스트 문자로 교정. 불가능하면 null.
