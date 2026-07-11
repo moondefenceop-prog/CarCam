@@ -23,41 +23,45 @@ class KoreanPlateRecognizerTest {
     }
 
     @Test
-    fun `lenient falls back to multi-char substitution`() {
-        // "아" misread as two Latin characters
-        assertEquals("80Of7890", KoreanPlateRecognizer.extractPlateNumberLenient("부산 80\nOf 7890"))
+    fun `lenient repairs multi-char substitution to the real character`() {
+        // "아" misread as two Latin characters "Of" — repaired via MULTI_CHAR_LOOKALIKE.
+        assertEquals("80아7890", KoreanPlateRecognizer.extractPlateNumberLenient("부산 80\nOf 7890"))
     }
 
     @Test
-    fun `lenient recovers from jamo-plus-1 vowel misread`() {
+    fun `lenient repairs jamo-plus-stroke vowel misread to the real syllable`() {
         // "너" (ㄴ+ㅓ) misread as bare jamo "ㄴ" + digit "1" from the vowel's vertical stroke,
-        // which otherwise corrupts the digit count and breaks both regex and digit matching.
+        // which otherwise corrupts the digit count. Repaired via JAMO_TO_EO after stripping the
+        // spurious digit.
         val result = KoreanPlateRecognizer.extractPlateNumberLenient("56ㄴ19876")
-        assertEquals("56ㄴ9876", result)
+        assertEquals("56너9876", result)
         assertEquals("569876", KoreanPlateRecognizer.digitsOnly(result!!))
     }
 
     @Test
-    fun `jamo-plus-1 fix does not fire without the digit run needing it`() {
+    fun `jamo-plus-stroke fix does not fire without the digit run needing it`() {
         // Should not spuriously alter text where strict pattern already matches.
         assertEquals("12가3456", KoreanPlateRecognizer.extractPlateNumberLenient("12가3456"))
     }
 
     @Test
-    fun `misread as a different but structurally valid syllable still digit-matches`() {
-        // "너" misread as "년" (a real, different Hangul syllable) — the strict pattern
-        // already accepts it since it's a valid single syllable; digitsOnly() is what makes
-        // the DB lookup still find the right car despite the wrong displayed character.
-        val result = KoreanPlateRecognizer.extractPlateNumber("56년9876")
+    fun `misread as a different non-whitelisted syllable still digit-matches even unrepaired`() {
+        // "너" (ㄴ+ㅓ) misread as "년" (ㄴ+ㅕ+ㄴ) — a different vowel plus a trailing consonant,
+        // not just a jongseong-only variant, so no repair rule recovers the exact character.
+        // The strict pattern rejects it since "년" isn't a real plate designation character;
+        // the lenient path can't repair it either and passes it through unrepaired — but
+        // digitsOnly() still lets the DB lookup find the right car regardless.
+        assertNull(KoreanPlateRecognizer.extractPlateNumber("56년9876"))
+        val result = KoreanPlateRecognizer.extractPlateNumberLenient("56년9876")
         assertEquals("56년9876", result)
         assertEquals("569876", KoreanPlateRecognizer.digitsOnly(result!!))
     }
 
     @Test
-    fun `misread as bare Latin letter still digit-matches`() {
+    fun `misread as bare Latin letter lookalike is repaired to the real syllable`() {
         // "너" misread as a single Latin letter "L" instead of splitting into jamo+digit.
         val result = KoreanPlateRecognizer.extractPlateNumberLenient("56L9876")
-        assertEquals("56L9876", result)
+        assertEquals("56너9876", result)
         assertEquals("569876", KoreanPlateRecognizer.digitsOnly(result!!))
     }
 
