@@ -25,7 +25,9 @@ class PlateRepository(context: Context) {
         val scannedDigits = KoreanPlateRecognizer.digitsOnly(trimmed)
         if (scannedDigits.length < 6) return null
         return dao.getAllPlatesOnce().firstOrNull {
-            KoreanPlateRecognizer.digitsOnly(it.plateNumber) == scannedDigits
+            KoreanPlateRecognizer.digitsOnly(it.plateNumber) == scannedDigits &&
+                // 양쪽 다 유효한 한글로 읽혔는데 글자가 다르면 숫자가 같아도 다른 차량
+                KoreanPlateRecognizer.isMiddleCompatible(trimmed, it.plateNumber)
         }
     }
 }

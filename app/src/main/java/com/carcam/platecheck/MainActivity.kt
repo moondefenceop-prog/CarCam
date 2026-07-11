@@ -59,6 +59,10 @@ class MainActivity : AppCompatActivity() {
     // 아직 모를 수 있다(대기 색상으로 표시했다가 조회 완료 시 다음 프레임에서 갱신됨).
     private val registrationCache = mutableMapOf<String, Boolean>()
 
+    // OCR 원문 → DB에 등록된 정확한 번호판. 숫자 기반 매칭으로 등록 차량을 찾은 경우
+    // 오인식된 표기('56년4895') 대신 등록된 표기('56너4895')를 화면에 보여주기 위한 캐시.
+    private val canonicalCache = mutableMapOf<String, String>()
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -101,6 +105,11 @@ class MainActivity : AppCompatActivity() {
             } else {
                 binding.tvScanning.isVisible = false
                 registrationCache[result.plateNumber] = result.isRegistered
+                if (result.canonicalPlate != result.plateNumber) {
+                    canonicalCache[result.plateNumber] = result.canonicalPlate
+                    // 최근 목록에도 교정된 표기로 반영
+                    replaceRecent(result.plateNumber, result.canonicalPlate)
+                }
 
                 // 캐시 3초 후 자동 소거 (이전 예약 취소 후 재등록)
                 clearResultRunnable?.let { binding.plateOverlay.removeCallbacks(it) }
@@ -260,7 +269,8 @@ class MainActivity : AppCompatActivity() {
                 clearOverlayRunnable?.let { binding.plateOverlay.removeCallbacks(it) }
                 clearOverlayRunnable = null
                 val coloredBoxes = plateBoxes.map { (rect, text) ->
-                    Triple(rect, text, registrationCache[text])
+                    // 등록 차량과 매칭된 경우 DB의 정확한 표기로 바꿔 표시
+                    Triple(rect, canonicalCache[text] ?: text, registrationCache[text])
                 }
                 binding.plateOverlay.setPlateBoxes(coloredBoxes, visibleRegion)
             } else {
@@ -284,6 +294,17 @@ class MainActivity : AppCompatActivity() {
             if (recentPlates.size > 5) recentPlates.removeLast()
             refreshRecentViews()
         }
+    }
+
+    // 최근 목록의 오인식 표기를 DB 기준 정확한 표기로 교체 (중복 생기면 하나로 합침)
+    private fun replaceRecent(oldPlate: String, newPlate: String) {
+        val idx = recentPlates.indexOf(oldPlate)
+        if (idx < 0) return
+        recentPlates.removeAt(idx)
+        if (newPlate !in recentPlates) {
+            recentPlates.add(minOf(idx, recentPlates.size), newPlate)
+        }
+        refreshRecentViews()
     }
 
     private fun refreshRecentViews() {
