@@ -35,12 +35,23 @@ class MainActivity : AppCompatActivity() {
     private val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
     private val activeJobs = java.util.concurrent.atomic.AtomicInteger(0)
 
-    // 프레임 쓰로틀: 카메라가 주는 모든 프레임(보통 30fps)을 다 인식하면 발열/배터리 부담이 크다.
-    // 한 프레임만 성공해도 확정되고(CONFIRM_THRESHOLD=1) 오버레이도 800ms 유지되므로, 초당 3회
-    // 정도만 분석해도 인식 성능 체감은 거의 그대로면서 부하는 크게 줄어든다. 저사양 기기에서는
-    // 인식 자체가 이 값보다 오래 걸려서(400~600ms) 사실상 이 값이 최소 휴식 시간 역할을 한다.
-    private val ANALYSIS_INTERVAL_MS = 300L
+    // 적응형 프레임 쓰로틀: 카메라가 주는 모든 프레임(보통 30fps)을 다 인식하면 발열/배터리
+    // 부담이 크다. 번호판(또는 후보)이 보이는 동안은 ACTIVE 간격으로 빠르게 돌고, 한동안
+    // 아무것도 안 보이면 IDLE 간격으로 늦춰서 CPU를 쉬게 한다. 뭔가 감지되는 순간 즉시
+    // ACTIVE로 복귀하므로 체감 반응속도는 그대로다.
+    private val ACTIVE_INTERVAL_MS = 300L
+    private val IDLE_INTERVAL_MS = 1000L
+    // ACTIVE 간격 기준 약 3초(10회) 연속 아무것도 없으면 IDLE 진입
+    private val IDLE_AFTER_MISSES = 10
+    @Volatile private var analysisIntervalMs = ACTIVE_INTERVAL_MS
+    @Volatile private var consecutiveMisses = 0
     private val lastAnalyzedAtMs = java.util.concurrent.atomic.AtomicLong(0)
+
+    // 확대 재인식(zoom pass)은 비트맵 변환 + 2차 추론이 겹쳐 일반 프레임의 2~3배 무겁다.
+    // 번호판 없이 숫자만 많은 장면(문서, 모니터 등)을 계속 비출 때 프레임마다 도는 것을
+    // 막기 위해 별도의 최소 간격을 둔다.
+    private val ZOOM_PASS_MIN_INTERVAL_MS = 800L
+    @Volatile private var lastZoomPassAtMs = 0L
 
     // 안정화: 1프레임만 보여도 즉시 표시 (인식률 우선)
     private val CONFIRM_THRESHOLD = 1
@@ -137,7 +148,7 @@ class MainActivity : AppCompatActivity() {
                     analysis.setAnalyzer(cameraExecutor) { imageProxy ->
                         val now = android.os.SystemClock.elapsedRealtime()
                         val prev = lastAnalyzedAtMs.get()
-                        if (now - prev < ANALYSIS_INTERVAL_MS || !lastAnalyzedAtMs.compareAndSet(prev, now)) {
+                        if (now - prev < analysisIntervalMs || !lastAnalyzedAtMs.compareAndSet(prev, now)) {
                             imageProxy.close()
                             return@setAnalyzer
                         }
@@ -193,24 +204,40 @@ class MainActivity : AppCompatActivity() {
                     imageProxy.close()
                     handleDetections(direct, visibleRegion)
                     activeJobs.decrementAndGet()
-                } else {
-                    // 1차 실패 → 프레임을 비트맵으로 변환해 애매한 영역만 잘라 확대 재인식 시도.
-                    // 실패한 프레임에서만 추가 비용이 발생하므로 평상시 속도는 그대로 유지된다.
-                    val uprightBitmap = runCatching {
-                        ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation)
-                    }.getOrNull()
-                    imageProxy.close()
+                    return@addOnSuccessListener
+                }
 
-                    if (uprightBitmap == null) {
-                        handleDetections(emptyList(), visibleRegion)
+                // 발열 핵심 수정: 확대 재인식할 후보 영역이 있는지부터 확인한다.
+                // 후보가 없는 평상시 프레임(대부분)은 비트맵 변환(YUV→JPEG→디코드→회전,
+                // 프레임당 수십 ms의 CPU 부하)을 아예 건너뛴다. 예전에는 이 변환을 먼저
+                // 해놓고 후보가 없으면 버렸는데, 그게 지속 발열의 주범이었다.
+                val ambiguousBox = PlateOcrEngine.findAmbiguousDigitBlocks(visionText).firstOrNull()
+                val nowMs = android.os.SystemClock.elapsedRealtime()
+                if (ambiguousBox == null || nowMs - lastZoomPassAtMs < ZOOM_PASS_MIN_INTERVAL_MS) {
+                    imageProxy.close()
+                    handleDetections(emptyList(), visibleRegion)
+                    activeJobs.decrementAndGet()
+                    return@addOnSuccessListener
+                }
+                lastZoomPassAtMs = nowMs
+
+                // 후보가 있을 때만 비트맵 변환 + 확대 재인식 (드문 경로)
+                val uprightBitmap = runCatching {
+                    ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation)
+                }.getOrNull()
+                imageProxy.close()
+
+                if (uprightBitmap == null) {
+                    handleDetections(emptyList(), visibleRegion)
+                    activeJobs.decrementAndGet()
+                } else {
+                    // 숫자 후보가 보였다는 것 자체가 활동 신호 → IDLE로 늦춰지지 않게 리셋
+                    noteActivity()
+                    // uprightBitmap은 전체 버퍼를 회전만 한 것이라 pass1과 같은 로지컬 좌표계를
+                    // 쓰므로, 같은 visibleRegion을 그대로 재사용할 수 있다.
+                    runZoomPass(ambiguousBox, uprightBitmap) { zoomDetections ->
+                        handleDetections(zoomDetections, visibleRegion)
                         activeJobs.decrementAndGet()
-                    } else {
-                        // uprightBitmap은 전체 버퍼를 회전만 한 것이라 pass1과 같은 로지컬 좌표계를
-                        // 쓰므로, 같은 visibleRegion을 그대로 재사용할 수 있다.
-                        runZoomPass(visionText, uprightBitmap) { zoomDetections ->
-                            handleDetections(zoomDetections, visibleRegion)
-                            activeJobs.decrementAndGet()
-                        }
                     }
                 }
             }
@@ -221,18 +248,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     // 1차 인식에서 놓친, 숫자가 충분히 보이는 애매한 영역(단일 블록 또는 초록 2단 번호판처럼 위아래로
-    // 쌓인 블록 쌍)만 잘라서 확대 + 대비 보정 후 다시 인식한다. 후보가 없으면 즉시 빈 결과로 끝난다.
+    // 쌓인 블록 쌍)만 잘라서 확대 + 대비 보정 후 다시 인식한다.
     private fun runZoomPass(
-        pass1Text: com.google.mlkit.vision.text.Text,
+        ambiguousBox: Rect,
         uprightBitmap: android.graphics.Bitmap,
         onResult: (List<Pair<Rect, String>>) -> Unit
     ) {
-        val ambiguousBox = PlateOcrEngine.findAmbiguousDigitBlocks(pass1Text).firstOrNull()
-        if (ambiguousBox == null) {
-            onResult(emptyList())
-            return
-        }
-
         val crop = ImageUtils.adjustContrast(ImageUtils.cropAndUpscale(uprightBitmap, ambiguousBox), 1.4f)
         recognizer.process(InputImage.fromBitmap(crop, 0))
             .addOnSuccessListener { cropText ->
@@ -247,7 +268,25 @@ class MainActivity : AppCompatActivity() {
             .addOnFailureListener { onResult(emptyList()) }
     }
 
+    // 뭔가 보임(번호판 확정 또는 숫자 후보) → 즉시 빠른 분석 간격으로 복귀
+    private fun noteActivity() {
+        consecutiveMisses = 0
+        analysisIntervalMs = ACTIVE_INTERVAL_MS
+    }
+
+    // 빈 프레임 연속 → 일정 횟수 넘으면 느린 간격(IDLE)으로 전환해 CPU를 쉬게 한다
+    private fun noteMiss() {
+        if (consecutiveMisses < IDLE_AFTER_MISSES) {
+            consecutiveMisses++
+            if (consecutiveMisses >= IDLE_AFTER_MISSES) {
+                analysisIntervalMs = IDLE_INTERVAL_MS
+            }
+        }
+    }
+
     private fun handleDetections(plateBoxes: List<Pair<Rect, String>>, visibleRegion: Rect) {
+        if (plateBoxes.isNotEmpty()) noteActivity() else noteMiss()
+
         for ((_, candidate) in plateBoxes) {
             // 연속 감지 카운트 증가
             val count = (plateConfirmCount[candidate] ?: 0) + 1

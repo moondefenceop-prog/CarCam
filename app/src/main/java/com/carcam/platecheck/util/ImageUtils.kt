@@ -98,10 +98,25 @@ object ImageUtils {
         val yRowStride = yPlane.rowStride
         val yPixelStride = yPlane.pixelStride
         var pos = 0
-        for (row in 0 until height) {
-            val rowStart = row * yRowStride
-            for (col in 0 until width) {
-                nv21[pos++] = yBuffer.get(rowStart + col * yPixelStride)
+        if (yPixelStride == 1) {
+            // 대부분의 기기가 여기 해당: 픽셀 단위 루프 대신 행 단위(또는 전체) 벌크 복사.
+            // 960x540 기준 약 52만 회의 get() 호출이 수백 회의 벌크 복사로 줄어든다.
+            if (yRowStride == width) {
+                yBuffer.position(0)
+                yBuffer.get(nv21, 0, width * height)
+            } else {
+                for (row in 0 until height) {
+                    yBuffer.position(row * yRowStride)
+                    yBuffer.get(nv21, row * width, width)
+                }
+            }
+            pos = width * height
+        } else {
+            for (row in 0 until height) {
+                val rowStart = row * yRowStride
+                for (col in 0 until width) {
+                    nv21[pos++] = yBuffer.get(rowStart + col * yPixelStride)
+                }
             }
         }
 
