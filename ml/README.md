@@ -25,10 +25,24 @@ Labels order = `labels.npy` = the VALID_MIDDLE set in `KoreanPlateRecognizer`.
 - Real app-pipeline crops of `154러7070`: 4/5 classified `러` (clean + 3/4 moiré frames),
   vs the template matcher's 0/4 confident `러` on the same moiré frames.
 
-## Next steps
-1. Android integration: bundle `glyph_cnn.tflite`, run in the numeric-only glyph fallback
-   (sweep offsets like the template matcher, take max-confidence class).
-2. Close the sim-to-real gap: real plate font, and fine-tune on captured real crops
-   (MainActivity already captures hard frames in debug builds).
+## Status of the CNN experiments
+Shipped: `train.py` (system-font synthetic, 40-class). Wired in the **numeric-only** fallback
+(MainActivity), benchmark exact 80%. This is the current production model.
+
+Tried and NOT shipped (all underperformed the 80% baseline on real degraded frames):
+- **Reject class** (41st non-Hangul class + wide sweep): localizes/rejects well and fixed 214머,
+  but the 41-class retrain regressed 러/로 net (`experimentCnnMiddle`: 8/26 vs ML Kit 18/26).
+- **Real plate font** (`train_realfont.py`, glyphs from kade93/kor_license_plate_generator, MIT):
+  improved 호/조/가/다 but regressed the moiré 러 frames (러→모), benchmark 70% < 80%.
+
+Key finding: the bottleneck is **degradation** (moiré / blur / small, low-res crops), not glyph
+shape. Clean plate-font renders + augmentation don't reproduce real screen-photo moiré, so global
+middle-correction and full 40-glyph reliability need a **real degraded labeled dataset at scale**
+(many plates, many conditions) — not just the font. `harvestGlyphs` (androidTest) collects such
+crops from the app pipeline; combine those with `train_realfont.py` glyphs once enough are gathered.
+
+## Files (extra)
+- `train_realfont.py` — trains on real plate-font glyph images + real digits (reject class).
+  Requires `KOR_PLATE_REPO` env var or a `kor_plate/` clone of kade93/kor_license_plate_generator.
 
 Requires: `pip install tensorflow opencv-python pillow numpy` (Python 3.11 tested, TF 2.21).
