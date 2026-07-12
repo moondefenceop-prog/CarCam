@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.carcam.platecheck.databinding.ActivityMainBinding
 import com.carcam.platecheck.ui.MainViewModel
+import com.carcam.platecheck.util.GlyphClassifier
 import com.carcam.platecheck.util.ImageUtils
 import com.carcam.platecheck.util.KoreanPlateRecognizer
 import com.carcam.platecheck.util.PlateOcrEngine
@@ -54,6 +55,9 @@ class MainActivity : AppCompatActivity() {
     // 막기 위해 별도의 최소 간격을 둔다.
     private val ZOOM_PASS_MIN_INTERVAL_MS = 800L
     @Volatile private var lastZoomPassAtMs = 0L
+
+    // 용도기호 분류기(CNN) 채택 신뢰도 임계값. 미달 시 템플릿 매처로 폴백.
+    private val GLYPH_CONFIDENCE = 0.5f
 
     // 안정화: 1프레임만 보여도 즉시 표시 (인식률 우선)
     private val CONFIRM_THRESHOLD = 1
@@ -94,6 +98,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // 용도기호 분류기 로드(에셋의 TFLite). 실패해도 템플릿 매처 폴백으로 동작한다.
+        runCatching { GlyphClassifier.init(applicationContext) }
+            .onFailure { Log.e("CarCam", "GlyphClassifier init failed", it) }
 
         recentViews = listOf(
             binding.tvRecent1, binding.tvRecent2, binding.tvRecent3,
@@ -225,11 +233,17 @@ class MainActivity : AppCompatActivity() {
                                 val digits = KoreanPlateRecognizer.digitsOnly(candidate)
                                 if (candidate.none { it in '가'..'힣' } && digits.length in 6..8) {
                                     val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
-                                    val match = PlateGlyphTemplateMatcher.matchModernPlate(
-                                        uprightBitmap, box, leading
-                                    )
-                                    if (match != null && PlateGlyphTemplateMatcher.isConfident(match)) {
-                                        box to (digits.take(leading) + match.character + digits.takeLast(4))
+                                    // Dedicated glyph classifier (covers ML Kit's ㅓ-column blind
+                                    // spot); fall back to the template matcher if it isn't confident.
+                                    val cnn = GlyphClassifier.classify(uprightBitmap, box, leading)
+                                    val recovered = if (cnn != null && cnn.confidence >= GLYPH_CONFIDENCE) {
+                                        cnn.character
+                                    } else {
+                                        PlateGlyphTemplateMatcher.matchModernPlate(uprightBitmap, box, leading)
+                                            ?.takeIf { PlateGlyphTemplateMatcher.isConfident(it) }?.character
+                                    }
+                                    if (recovered != null) {
+                                        box to (digits.take(leading) + recovered + digits.takeLast(4))
                                     } else box to candidate
                                 } else box to candidate
                             }

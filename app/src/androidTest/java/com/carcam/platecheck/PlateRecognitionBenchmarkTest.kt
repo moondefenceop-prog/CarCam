@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.carcam.platecheck.util.GlyphClassifier
 import com.carcam.platecheck.util.ImageUtils
 import com.carcam.platecheck.util.KoreanPlateRecognizer
 import com.carcam.platecheck.util.PlateOcrEngine
@@ -38,6 +39,9 @@ import java.util.concurrent.TimeUnit
  */
 @RunWith(AndroidJUnit4::class)
 class PlateRecognitionBenchmarkTest {
+
+    private var glyphMode = "cnn"
+    private val CNN_THRESHOLD = 0.5f
 
     private data class OcrConfig(
         val name: String,
@@ -101,6 +105,11 @@ class PlateRecognitionBenchmarkTest {
 
         val csv = StringBuilder("config,file,expected,actual,exact_match,digit_match,latency_ms\n")
         val summaries = mutableListOf<String>()
+
+        // Middle-glyph recovery method: -e glyph cnn|template (default cnn).
+        glyphMode = InstrumentationRegistry.getArguments().getString("glyph") ?: "cnn"
+        if (glyphMode == "cnn") GlyphClassifier.init(InstrumentationRegistry.getInstrumentation().targetContext)
+        Log.i(TAG, "Middle-glyph mode = $glyphMode (cnn ready=${GlyphClassifier.isReady()})")
 
         val requestedConfig = InstrumentationRegistry.getArguments().getString("config")
         for (config in configs.filter { requestedConfig == null || it.name == requestedConfig }) {
@@ -491,11 +500,19 @@ class PlateRecognitionBenchmarkTest {
             val digits = KoreanPlateRecognizer.digitsOnly(candidate)
             if (box != null && candidate.none { it in '가'..'힣' } && digits.length in 6..8) {
                 val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
-                val match = PlateGlyphTemplateMatcher.matchModernPlate(bitmap, box, leading)
-                Log.i(TAG, "TEMPLATE raw=$candidate match=$match box=$box")
-                if (match != null && PlateGlyphTemplateMatcher.isConfident(match)) {
-                    digits.take(leading) + match.character + digits.takeLast(4)
-                } else candidate
+                if (glyphMode == "cnn" && GlyphClassifier.isReady()) {
+                    val r = GlyphClassifier.classify(bitmap, box, leading)
+                    Log.i(TAG, "CNN raw=$candidate result=$r box=$box")
+                    if (r != null && r.confidence >= CNN_THRESHOLD) {
+                        digits.take(leading) + r.character + digits.takeLast(4)
+                    } else candidate
+                } else {
+                    val match = PlateGlyphTemplateMatcher.matchModernPlate(bitmap, box, leading)
+                    Log.i(TAG, "TEMPLATE raw=$candidate match=$match box=$box")
+                    if (match != null && PlateGlyphTemplateMatcher.isConfident(match)) {
+                        digits.take(leading) + match.character + digits.takeLast(4)
+                    } else candidate
+                }
             } else candidate
         }
     }

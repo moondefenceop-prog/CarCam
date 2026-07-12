@@ -22,6 +22,11 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        // Keep the .tflite uncompressed so it can be memory-mapped at runtime.
+        noCompress += "tflite"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -45,6 +50,7 @@ dependencies {
     implementation(libs.camerax.lifecycle)
     implementation(libs.camerax.view)
     implementation(libs.mlkit.text.recognition)
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)
