@@ -76,6 +76,14 @@ class MainActivity : AppCompatActivity() {
     // 오인식된 표기('56년4895') 대신 등록된 표기('56너4895')를 화면에 보여주기 위한 캐시.
     private val canonicalCache = mutableMapOf<String, String>()
 
+    // 디버그 프레임 캡처: 가운데 한글이 숫자로만 읽힌(=템플릿 폴백에 의존하는) 어려운 프레임을
+    // 저장해 테스트셋에 추가하기 위한 것. 실기기에서 실패하는 실제 카메라 프레임을 확보하는 용도로,
+    // 디버그 빌드에서만 동작한다. 저장 위치: /sdcard/Android/data/<pkg>/files/captures/
+    private val CAPTURE_MIN_INTERVAL_MS = 400L
+    private val CAPTURE_MAX_FILES = 60
+    @Volatile private var lastCaptureAtMs = 0L
+    private val captureCount = java.util.concurrent.atomic.AtomicInteger(0)
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -210,6 +218,9 @@ class MainActivity : AppCompatActivity() {
                             ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation)
                         }.getOrNull()
                         if (uprightBitmap != null) {
+                            // 이 경로에 들어왔다는 것 자체가 ML Kit이 가운데 한글을 못 읽은 어려운
+                            // 프레임이라는 뜻 → 디버그 빌드에서 테스트셋 후보로 저장한다.
+                            maybeCaptureHardFrame(uprightBitmap, direct)
                             direct = direct.map { (box, candidate) ->
                                 val digits = KoreanPlateRecognizer.digitsOnly(candidate)
                                 if (candidate.none { it in '가'..'힣' } && digits.length in 6..8) {
@@ -289,6 +300,37 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .addOnFailureListener { onResult(emptyList()) }
+    }
+
+    // 어려운 프레임(가운데 한글이 숫자로만 읽힘)을 PNG로 저장해 테스트셋 후보로 남긴다.
+    // 파일명에 인식된 숫자열을 넣어 나중에 라벨링/선별하기 쉽게 한다. 디버그 빌드 전용.
+    private fun maybeCaptureHardFrame(bitmap: android.graphics.Bitmap, detections: List<Pair<Rect, String>>) {
+        if (!BuildConfig.DEBUG) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastCaptureAtMs < CAPTURE_MIN_INTERVAL_MS) return
+        if (captureCount.get() >= CAPTURE_MAX_FILES) return
+        lastCaptureAtMs = now
+
+        // 캡처는 파일 IO라 분석 스레드를 막지 않도록 별도 스레드에서 처리.
+        val snapshot = bitmap.copy(bitmap.config ?: android.graphics.Bitmap.Config.ARGB_8888, false)
+        val digits = detections.firstOrNull()?.second?.let { KoreanPlateRecognizer.digitsOnly(it) } ?: "none"
+        Thread {
+            try {
+                val dir = java.io.File(getExternalFilesDir(null), "captures").apply { mkdirs() }
+                val existing = dir.listFiles()?.size ?: 0
+                if (existing >= CAPTURE_MAX_FILES) return@Thread
+                val file = java.io.File(dir, "cap_${System.currentTimeMillis()}_$digits.png")
+                java.io.FileOutputStream(file).use { out ->
+                    snapshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                }
+                captureCount.incrementAndGet()
+                Log.i("CarCam", "Captured hard frame: ${file.name} (${snapshot.width}x${snapshot.height})")
+            } catch (e: Exception) {
+                Log.e("CarCam", "Frame capture failed", e)
+            } finally {
+                snapshot.recycle()
+            }
+        }.start()
     }
 
     // 뭔가 보임(번호판 확정 또는 숫자 후보) → 즉시 빠른 분석 간격으로 복귀

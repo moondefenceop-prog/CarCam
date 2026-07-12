@@ -30,24 +30,53 @@ object PlateGlyphTemplateMatcher {
         glyphs.associateWith { char -> typefaces.map { render(char, it) } }
     }
 
+    // ML Kit's plate-line box jitters: it often drops the leftmost digit from the geometry (but not
+    // the text), and the exact left/right edges shift frame to frame. A single-point estimate of the
+    // Hangul slot is therefore only accurate on clean, head-on shots — on noisier live-camera frames
+    // it can be off by up to ~half a slot, which is what pushes the match below the confidence margin.
+    // Sweep the slot's horizontal center (in units of the character pitch) and its width, keeping the
+    // most confident hit, so residual geometry error still lands a well-aligned crop.
+    private val CENTER_OFFSET_FACTORS = floatArrayOf(-0.5f, -0.35f, -0.2f, -0.1f, 0f, 0.1f, 0.2f, 0.35f, 0.5f)
+    private val HALF_WIDTH_FACTORS = floatArrayOf(0.45f, 0.55f, 0.66f)
+
     /**
      * [lineBox] is ML Kit's box for the full plate line. [leadingDigits] is normally 3.
      * Modern plates have 8 visual slots: 3 digits, one Hangul, and 4 digits.
      */
     fun matchModernPlate(bitmap: Bitmap, lineBox: Rect, leadingDigits: Int): Match? {
         if (leadingDigits !in 2..3 || lineBox.width() <= 0 || lineBox.height() <= 0) return null
-        // ML Kit often drops the leftmost digit from its geometry even though it remains in text.
-        // The right edge is stable, so locate Hangul four-and-a-half character pitches from it.
-        val slotWidth = lineBox.height() * 0.70f
-        val centerX = lineBox.right - 4.5f * slotWidth
-        val crop = Rect(
-            (centerX - slotWidth * 0.58f).toInt().coerceAtLeast(0),
-            (lineBox.top - lineBox.height() * 0.08f).toInt().coerceAtLeast(0),
-            (centerX + slotWidth * 0.58f).toInt().coerceAtMost(bitmap.width),
-            (lineBox.bottom + lineBox.height() * 0.08f).toInt().coerceAtMost(bitmap.height)
-        )
-        if (crop.width() < 8 || crop.height() < 8) return null
-        val observed = normalize(Bitmap.createBitmap(bitmap, crop.left, crop.top, crop.width(), crop.height()))
+        // Locate the Hangul from the box WIDTH, not its height: the line box spans all N character
+        // slots (leadingDigits + 1 Hangul + 4 trailing), so the pitch is width/N and the Hangul sits
+        // at index [leadingDigits]. This is far more accurate than a height-derived slot guess, which
+        // drifts by several pixels per slot and pushed the crop off the glyph on real-camera frames.
+        val totalSlots = leadingDigits + 5
+        val slotPitch = lineBox.width().toFloat() / totalSlots
+        val baseCenterX = lineBox.left + (leadingDigits + 0.5f) * slotPitch
+        val top = (lineBox.top - lineBox.height() * 0.08f).toInt().coerceAtLeast(0)
+        val bottom = (lineBox.bottom + lineBox.height() * 0.08f).toInt().coerceAtMost(bitmap.height)
+        if (bottom - top < 8) return null
+
+        var best: Match? = null
+        for (dxFactor in CENTER_OFFSET_FACTORS) {
+            val centerX = baseCenterX + dxFactor * slotPitch
+            for (hwFactor in HALF_WIDTH_FACTORS) {
+                val halfWidth = slotPitch * hwFactor
+                val left = (centerX - halfWidth).toInt().coerceAtLeast(0)
+                val right = (centerX + halfWidth).toInt().coerceAtMost(bitmap.width)
+                if (right - left < 8) continue
+                val candidate = matchCrop(bitmap, left, top, right, bottom) ?: continue
+                // Prefer the crop that maximizes confidence overall: a well-centered glyph scores
+                // high AND separates cleanly from the runner-up, so score+margin captures both.
+                if (best == null || candidate.score + candidate.margin > best.score + best.margin) {
+                    best = candidate
+                }
+            }
+        }
+        return best
+    }
+
+    private fun matchCrop(bitmap: Bitmap, left: Int, top: Int, right: Int, bottom: Int): Match? {
+        val observed = normalize(Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top))
             ?: return null
         val ranked = glyphs.map { char ->
             char to templates.getValue(char).maxOf { dice(observed, it) }

@@ -134,6 +134,135 @@ class PlateRecognitionBenchmarkTest {
         Log.i(TAG, "===== CSV =====\n$csv")
     }
 
+    private data class ReOcrStrategy(
+        val name: String,
+        val zoomDim: Int,
+        val contrast: Float?,
+        val grayscale: Boolean,
+        // Downscale-then-upscale factor to attenuate moiré before the zoom (1f = disabled).
+        val moireBlur: Float = 1f
+    )
+
+    /**
+     * Diagnostic: for the frames where pass-1 fails to read the middle Hangul (bare digits or a
+     * misread char), crop the plate region from full-res and RE-RUN ML Kit with various
+     * preprocessing. Logs what each strategy reads so we can find one that recovers e.g. '러'.
+     * Run: gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.carcam.platecheck.PlateRecognitionBenchmarkTest#experimentReOcr
+     */
+    @Test
+    fun experimentReOcr() {
+        val context = InstrumentationRegistry.getInstrumentation().context
+        val cases = loadLabeledCases(context)
+        assumeTrue("No labeled photos found.", cases.isNotEmpty())
+
+        val strategies = listOf(
+            ReOcrStrategy("crop1400_color_noC", 1400, null, false),
+            ReOcrStrategy("crop1400_c14", 1400, 1.4f, false),
+            ReOcrStrategy("crop2000_c14", 2000, 1.4f, false),
+            ReOcrStrategy("crop2400_c16", 2400, 1.6f, false),
+            ReOcrStrategy("crop1400_gray_c16", 1400, 1.6f, true),
+            ReOcrStrategy("crop1600_moire_c14", 1600, 1.4f, false, moireBlur = 0.5f),
+        )
+
+        val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+        try {
+            val warmup = Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888)
+            runCatching { Tasks.await(recognizer.process(InputImage.fromBitmap(warmup, 0)), 30, TimeUnit.SECONDS) }
+
+            for ((file, expected) in cases) {
+                val fullRes = loadBitmapWithExifRotation(context, "plates/$file")
+                val pass1 = resizeToMaxDim(fullRes, 960)
+                val scale = fullRes.width.toFloat() / pass1.width
+                val pass1Text = Tasks.await(recognizer.process(InputImage.fromBitmap(pass1, 0)), 15, TimeUnit.SECONDS)
+
+                val pass1Plates = PlateOcrEngine.extractPlates(pass1Text)
+                val pass1Extracted = pass1Plates.joinToString(",") { it.second }
+                // A middle char is "recovered" already if any candidate parses strictly (valid usage Hangul).
+                val alreadyGood = pass1Plates.any { KoreanPlateRecognizer.extractPlateNumber(it.second) != null }
+                Log.i(TAG, "REOCR file=$file expected=$expected pass1=[${pass1Text.text.replace("\n", "|")}] extracted=[$pass1Extracted] alreadyGood=$alreadyGood")
+                if (alreadyGood) continue
+
+                // Candidate plate boxes to zoom into: prefer boxes of digit-bearing plate candidates,
+                // fall back to ambiguous digit blocks.
+                val boxes = (pass1Plates.mapNotNull { it.first } + PlateOcrEngine.findAmbiguousDigitBlocks(pass1Text))
+                    .distinct()
+                for (box in boxes) {
+                    val fr = Rect(
+                        (box.left * scale).toInt(), (box.top * scale).toInt(),
+                        (box.right * scale).toInt(), (box.bottom * scale).toInt()
+                    )
+                    for (s in strategies) {
+                        var src = fullRes
+                        if (s.moireBlur < 1f) {
+                            val dw = (fullRes.width * s.moireBlur).toInt().coerceAtLeast(1)
+                            val dh = (fullRes.height * s.moireBlur).toInt().coerceAtLeast(1)
+                            src = Bitmap.createScaledBitmap(Bitmap.createScaledBitmap(fullRes, dw, dh, true), fullRes.width, fullRes.height, true)
+                        }
+                        var crop = ImageUtils.cropAndUpscale(src, fr, targetMaxDim = s.zoomDim)
+                        if (s.grayscale) crop = ImageUtils.toGrayscale(crop)
+                        s.contrast?.let { crop = ImageUtils.adjustContrast(crop, it) }
+                        val t2 = Tasks.await(recognizer.process(InputImage.fromBitmap(crop, 0)), 15, TimeUnit.SECONDS)
+                        val ex = PlateOcrEngine.extractPlates(t2).joinToString(",") { it.second }
+                        val strict = PlateOcrEngine.extractPlates(t2).any { KoreanPlateRecognizer.extractPlateNumber(it.second) != null }
+                        Log.i(TAG, "  [${s.name}] raw=[${t2.text.replace("\n", "|")}] extracted=[$ex] strictMiddle=$strict")
+                    }
+                }
+            }
+        } finally {
+            recognizer.close()
+        }
+    }
+
+    /**
+     * Diagnostic: dump the exact Hangul-slot crops the template matcher evaluates, so we can eyeball
+     * whether the geometry actually isolates '러' or cuts off its vertical vowel stroke.
+     * Saves PNGs to the test app's external files dir; pull with adb afterwards.
+     */
+    @Test
+    fun dumpGlyphCrops() {
+        val context = InstrumentationRegistry.getInstrumentation().context
+        val cases = loadLabeledCases(context).filter { it.second.contains("러") }
+        val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+        val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
+        val dir = java.io.File(targetContext.filesDir, "glyphdump").apply { mkdirs() }
+        try {
+            val warmup = Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888)
+            runCatching { Tasks.await(recognizer.process(InputImage.fromBitmap(warmup, 0)), 30, TimeUnit.SECONDS) }
+            for ((idx, case) in cases.withIndex()) {
+                val (file, _) = case
+                val bmp = resizeToMaxDim(loadBitmapWithExifRotation(context, "plates/$file"), 960)
+                val text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 15, TimeUnit.SECONDS)
+                val box = PlateOcrEngine.extractPlates(text).mapNotNull { it.first }
+                    .maxByOrNull { it.width() } ?: continue
+                val tag = "case$idx"  // ASCII name so adb run-as can cat it back
+                // Save the whole plate-line box, then the estimated Hangul slot at three offsets.
+                saveCrop(bmp, box, java.io.File(dir, "${tag}_line.png"))
+                val slotWidth = box.height() * 0.70f
+                val baseCenterX = box.right - 4.5f * slotWidth
+                for (dx in floatArrayOf(-0.3f, 0f, 0.3f)) {
+                    val cx = baseCenterX + dx * slotWidth
+                    val crop = Rect(
+                        (cx - slotWidth * 0.66f).toInt().coerceAtLeast(0),
+                        (box.top - box.height() * 0.08f).toInt().coerceAtLeast(0),
+                        (cx + slotWidth * 0.66f).toInt().coerceAtMost(bmp.width),
+                        (box.bottom + box.height() * 0.08f).toInt().coerceAtMost(bmp.height)
+                    )
+                    saveCrop(bmp, crop, java.io.File(dir, "${tag}_slot_${dx}.png"))
+                }
+                Log.i(TAG, "DUMP $file box=$box -> ${dir.absolutePath}")
+            }
+        } finally {
+            recognizer.close()
+        }
+    }
+
+    private fun saveCrop(src: Bitmap, box: Rect, dest: java.io.File) {
+        val l = box.left.coerceIn(0, src.width - 1); val t = box.top.coerceIn(0, src.height - 1)
+        val r = box.right.coerceIn(l + 1, src.width); val b = box.bottom.coerceIn(t + 1, src.height)
+        val crop = Bitmap.createBitmap(src, l, t, r - l, b - t)
+        java.io.FileOutputStream(dest).use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
     private fun runConfig(context: Context, config: OcrConfig, cases: List<Pair<String, String>>): List<CaseResult> {
         val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
         val results = mutableListOf<CaseResult>()
