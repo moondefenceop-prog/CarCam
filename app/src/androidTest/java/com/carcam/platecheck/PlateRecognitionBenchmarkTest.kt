@@ -330,16 +330,16 @@ class PlateRecognitionBenchmarkTest {
                 val box = PlateOcrEngine.extractPlates(text).mapNotNull { it.first }
                     .maxByOrNull { it.width() } ?: continue
                 val tag = "case$idx"  // ASCII name so adb run-as can cat it back
-                // Save the whole plate-line box, then the estimated Hangul slot at three offsets.
+                // Save the whole plate-line box, then the width-derived Hangul slot at three offsets.
                 saveCrop(bmp, box, java.io.File(dir, "${tag}_line.png"))
-                val slotWidth = box.height() * 0.70f
-                val baseCenterX = box.right - 4.5f * slotWidth
-                for (dx in floatArrayOf(-0.3f, 0f, 0.3f)) {
-                    val cx = baseCenterX + dx * slotWidth
+                val slotPitch = box.width() / 8f
+                val baseCenterX = box.left + 3.5f * slotPitch
+                for (dx in floatArrayOf(-0.2f, 0f, 0.2f)) {
+                    val cx = baseCenterX + dx * slotPitch
                     val crop = Rect(
-                        (cx - slotWidth * 0.66f).toInt().coerceAtLeast(0),
+                        (cx - slotPitch * 0.55f).toInt().coerceAtLeast(0),
                         (box.top - box.height() * 0.08f).toInt().coerceAtLeast(0),
-                        (cx + slotWidth * 0.66f).toInt().coerceAtMost(bmp.width),
+                        (cx + slotPitch * 0.55f).toInt().coerceAtMost(bmp.width),
                         (box.bottom + box.height() * 0.08f).toInt().coerceAtMost(bmp.height)
                     )
                     saveCrop(bmp, crop, java.io.File(dir, "${tag}_slot_${dx}.png"))

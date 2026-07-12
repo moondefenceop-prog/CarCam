@@ -1,0 +1,3 @@
+*.keras
+glyph_preview.png
+__pycache__/
