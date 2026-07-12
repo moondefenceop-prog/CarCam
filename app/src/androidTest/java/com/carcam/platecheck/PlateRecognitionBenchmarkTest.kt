@@ -23,6 +23,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import org.junit.Assume.assumeTrue
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.ByteArrayInputStream
@@ -149,6 +150,7 @@ class PlateRecognitionBenchmarkTest {
      * preprocessing. Logs what each strategy reads so we can find one that recovers e.g. '러'.
      * Run: gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.carcam.platecheck.PlateRecognitionBenchmarkTest#experimentReOcr
      */
+    @Ignore("Diagnostic only; run explicitly. Proved ML Kit re-OCR cannot recover this '러' under moire.")
     @Test
     fun experimentReOcr() {
         val context = InstrumentationRegistry.getInstrumentation().context
@@ -218,6 +220,7 @@ class PlateRecognitionBenchmarkTest {
      * whether the geometry actually isolates '러' or cuts off its vertical vowel stroke.
      * Saves PNGs to the test app's external files dir; pull with adb afterwards.
      */
+    @Ignore("Diagnostic only; run explicitly. Dumps Hangul-slot crops for offline inspection.")
     @Test
     fun dumpGlyphCrops() {
         val context = InstrumentationRegistry.getInstrumentation().context
