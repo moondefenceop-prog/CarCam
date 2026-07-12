@@ -144,6 +144,88 @@ class PlateRecognitionBenchmarkTest {
         Log.i(TAG, "===== CSV =====\n$csv")
     }
 
+    /**
+     * Diagnostic: run the glyph CNN on the middle slot of EVERY plate (not just numeric-only reads)
+     * to see whether always using it to correct the middle char is a safe global win — i.e. does it
+     * fix ML Kit's valid-but-wrong reads (머→허) without breaking the ones ML Kit gets right?
+     */
+    /**
+     * Harvest labeled real glyph crops (same pipeline the app feeds the CNN) into the app's files
+     * dir for fine-tuning. Each plate yields several offset crops. Filename: <label>__<file>__<i>.png
+     * Pull with: adb exec-out run-as com.carcam.platecheck tar c -C files harvest > harvest.tar
+     */
+    @Ignore("Diagnostic only; run explicitly. Harvests labeled glyph crops for CNN fine-tuning.")
+    @Test
+    fun harvestGlyphs() {
+        val context = InstrumentationRegistry.getInstrumentation().context
+        val target = InstrumentationRegistry.getInstrumentation().targetContext
+        val dir = java.io.File(target.filesDir, "harvest").apply { mkdirs() }
+        val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+        var saved = 0
+        try {
+            val warmup = Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888)
+            runCatching { Tasks.await(recognizer.process(InputImage.fromBitmap(warmup, 0)), 30, TimeUnit.SECONDS) }
+            for ((file, expected) in loadLabeledCases(context)) {
+                val label = expected.firstOrNull { it in '가'..'힣' } ?: continue
+                val bmp = resizeToMaxDim(loadBitmapWithExifRotation(context, "plates/$file"), 960)
+                val text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 15, TimeUnit.SECONDS)
+                val box = (PlateOcrEngine.extractPlates(text).mapNotNull { it.first } +
+                    PlateOcrEngine.findAmbiguousDigitBlocks(text)).maxByOrNull { it.width() } ?: continue
+                val cand = PlateOcrEngine.extractPlates(text).maxByOrNull { (it.first?.width() ?: 0) }?.second ?: ""
+                val digits = KoreanPlateRecognizer.digitsOnly(cand).ifEmpty { KoreanPlateRecognizer.digitsOnly(expected) }
+                if (digits.length !in 6..8) continue
+                val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
+                val totalSlots = leading + 5
+                val pitch = box.width().toFloat() / totalSlots
+                val baseCx = box.left + (leading + 0.5f) * pitch
+                val top = (box.top - box.height() * 0.08f).toInt().coerceAtLeast(0)
+                val bottom = (box.bottom + box.height() * 0.08f).toInt().coerceAtMost(bmp.height)
+                var i = 0
+                for (dx in floatArrayOf(-0.2f, -0.1f, 0f, 0.1f, 0.2f)) for (hw in floatArrayOf(0.5f, 0.6f)) {
+                    val cx = baseCx + dx * pitch; val half = pitch * hw
+                    val l = (cx - half).toInt().coerceAtLeast(0); val r = (cx + half).toInt().coerceAtMost(bmp.width)
+                    if (r - l < 8 || bottom - top < 8) continue
+                    val crop = Bitmap.createBitmap(bmp, l, top, r - l, bottom - top)
+                    val f = java.io.File(dir, "${label}__${file.substringBeforeLast(".")}__${i}.png")
+                    java.io.FileOutputStream(f).use { crop.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    i++; saved++
+                }
+            }
+            Log.i(TAG, "HARVEST saved=$saved crops to ${dir.absolutePath}")
+        } finally { recognizer.close() }
+    }
+
+    @Ignore("Diagnostic only; run explicitly. Showed synthetic-only CNN is unreliable for global middle correction (~48% on real plates).")
+    @Test
+    fun experimentCnnMiddle() {
+        val context = InstrumentationRegistry.getInstrumentation().context
+        GlyphClassifier.init(InstrumentationRegistry.getInstrumentation().targetContext)
+        val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+        var mlkitOk = 0; var cnnOk = 0; var n = 0
+        try {
+            val warmup = Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888)
+            runCatching { Tasks.await(recognizer.process(InputImage.fromBitmap(warmup, 0)), 30, TimeUnit.SECONDS) }
+            for ((file, expected) in loadLabeledCases(context)) {
+                val expMid = expected.firstOrNull { it in '가'..'힣' } ?: continue
+                val bmp = resizeToMaxDim(loadBitmapWithExifRotation(context, "plates/$file"), 960)
+                val text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 15, TimeUnit.SECONDS)
+                val (box, cand) = PlateOcrEngine.extractPlates(text).mapNotNull { (b, t) -> b?.let { it to t } }
+                    .maxByOrNull { it.first.width() } ?: continue
+                val digits = KoreanPlateRecognizer.digitsOnly(cand)
+                if (digits.length !in 6..8) continue
+                val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
+                val mlMid = cand.firstOrNull { it in '가'..'힣' }
+                val cnn = GlyphClassifier.classify(bmp, box, leading)
+                n++
+                if (mlMid == expMid) mlkitOk++
+                if (cnn?.character == expMid) cnnOk++
+                Log.i(TAG, "CNNMID $file exp=$expMid mlkit=${mlMid ?: "(none)"} cnn=${cnn?.character}(${"%.2f".format(cnn?.confidence)}) " +
+                    "${if (cnn?.character==expMid) "CNN-ok" else ""}${if (mlMid==expMid) " ML-ok" else ""}")
+            }
+            Log.i(TAG, "CNNMID SUMMARY n=$n  mlkit-middle-correct=$mlkitOk  cnn-middle-correct=$cnnOk")
+        } finally { recognizer.close() }
+    }
+
     private data class ReOcrStrategy(
         val name: String,
         val zoomDim: Int,
