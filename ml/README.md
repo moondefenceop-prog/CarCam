@@ -34,6 +34,9 @@ Tried and NOT shipped (all underperformed the 80% baseline on real degraded fram
   but the 41-class retrain regressed 러/로 net (`experimentCnnMiddle`: 8/26 vs ML Kit 18/26).
 - **Real plate font** (`train_realfont.py`, glyphs from kade93/kor_license_plate_generator, MIT):
   improved 호/조/가/다 but regressed the moiré 러 frames (러→모), benchmark 70% < 80%.
+- **Mixed system+real fonts** (`train_mixed.py`, 55% real plate glyphs / 45% system fonts, same
+  framing as the shipped model): 63.2% vs the baseline's 68.4% on the same set — still a net
+  regression. Real-font shapes help clean glyphs but hurt the moiré-degraded frames.
 
 Key finding: the bottleneck is **degradation** (moiré / blur / small, low-res crops), not glyph
 shape. Clean plate-font renders + augmentation don't reproduce real screen-photo moiré, so global
