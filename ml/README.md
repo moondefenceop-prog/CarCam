@@ -44,5 +44,8 @@ crops from the app pipeline; combine those with `train_realfont.py` glyphs once 
 ## Files (extra)
 - `train_realfont.py` — trains on real plate-font glyph images + real digits (reject class).
   Requires `KOR_PLATE_REPO` env var or a `kor_plate/` clone of kade93/kor_license_plate_generator.
+- `make_samples.py` — renders 50 diverse plates (all 39 usage glyphs, 2/3-digit formats) in the
+  real plate font as PNGs + a contact sheet + `gallery.html` (one plate per screen), for manual
+  recognition testing. Photograph plates **individually** (fill the frame), not the contact sheet.
 
 Requires: `pip install tensorflow opencv-python pillow numpy` (Python 3.11 tested, TF 2.21).
