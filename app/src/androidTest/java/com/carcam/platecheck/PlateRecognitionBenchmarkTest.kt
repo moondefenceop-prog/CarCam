@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.carcam.platecheck.util.ImageUtils
 import com.carcam.platecheck.util.KoreanPlateRecognizer
 import com.carcam.platecheck.util.PlateOcrEngine
+import com.carcam.platecheck.util.PlateGlyphTemplateMatcher
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -89,7 +90,8 @@ class PlateRecognitionBenchmarkTest {
         // Use the instrumentation's own context (test APK), not targetContext (app APK) —
         // assets/plates/ is packaged into the androidTest APK, which only the test context can see.
         val context = InstrumentationRegistry.getInstrumentation().context
-        val cases = loadLabeledCases(context)
+        val requestedFile = InstrumentationRegistry.getArguments().getString("file")
+        val cases = loadLabeledCases(context).filter { requestedFile == null || it.first == requestedFile }
         assumeTrue(
             "No labeled photos found in assets/plates/ — add photos before running this benchmark.",
             cases.isNotEmpty()
@@ -99,7 +101,8 @@ class PlateRecognitionBenchmarkTest {
         val csv = StringBuilder("config,file,expected,actual,exact_match,digit_match,latency_ms\n")
         val summaries = mutableListOf<String>()
 
-        for (config in configs) {
+        val requestedConfig = InstrumentationRegistry.getArguments().getString("config")
+        for (config in configs.filter { requestedConfig == null || it.name == requestedConfig }) {
             val results = if (config.twoPass) {
                 runTwoPassConfig(context, config, cases)
             } else {
@@ -150,7 +153,17 @@ class PlateRecognitionBenchmarkTest {
                 val visionText = Tasks.await(recognizer.process(image), 15, TimeUnit.SECONDS)
                 val latency = SystemClock.elapsedRealtime() - start
 
-                val candidates = PlateOcrEngine.extractPlates(visionText).map { it.second }
+                if (expected == "154러7070") {
+                    visionText.textBlocks.forEach { block ->
+                        Log.i(TAG, "BLOCK text=${block.text.replace("\n", "|")} box=${block.boundingBox}")
+                        block.lines.forEach { line ->
+                            Log.i(TAG, " LINE text=${line.text} box=${line.boundingBox}")
+                            line.elements.forEach { element -> Log.i(TAG, "  ELEMENT text=${element.text} box=${element.boundingBox}") }
+                        }
+                    }
+                }
+
+                val candidates = applyTemplateFallback(bitmap, visionText)
                 val expectedDigits = KoreanPlateRecognizer.digitsOnly(expected)
                 val exactMatch = candidates.contains(expected)
                 val digitMatch = exactMatch || candidates.any { KoreanPlateRecognizer.candidateDigitKeys(it).contains(expectedDigits) }
@@ -187,7 +200,7 @@ class PlateRecognitionBenchmarkTest {
                 val start = SystemClock.elapsedRealtime()
 
                 val pass1Text = Tasks.await(recognizer.process(InputImage.fromBitmap(pass1Bitmap, 0)), 15, TimeUnit.SECONDS)
-                var candidates = PlateOcrEngine.extractPlates(pass1Text).map { it.second }
+                var candidates = applyTemplateFallback(pass1Bitmap, pass1Text)
                 var rawText = "pass1:" + pass1Text.text.replace("\n", "|")
 
                 if (candidates.isEmpty()) {
@@ -246,6 +259,20 @@ class PlateRecognitionBenchmarkTest {
             val base = file.substringBeforeLast(".")
             val expected = base.replace(Regex("_\\d+$"), "")
             file to expected
+        }
+    }
+
+    private fun applyTemplateFallback(bitmap: Bitmap, text: com.google.mlkit.vision.text.Text): List<String> {
+        return PlateOcrEngine.extractPlates(text).map { (box, candidate) ->
+            val digits = KoreanPlateRecognizer.digitsOnly(candidate)
+            if (box != null && candidate.none { it in '가'..'힣' } && digits.length in 6..8) {
+                val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
+                val match = PlateGlyphTemplateMatcher.matchModernPlate(bitmap, box, leading)
+                Log.i(TAG, "TEMPLATE raw=$candidate match=$match box=$box")
+                if (match != null && PlateGlyphTemplateMatcher.isConfident(match)) {
+                    digits.take(leading) + match.character + digits.takeLast(4)
+                } else candidate
+            } else candidate
         }
     }
 

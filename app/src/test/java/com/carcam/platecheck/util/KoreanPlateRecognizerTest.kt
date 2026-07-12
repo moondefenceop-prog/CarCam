@@ -45,7 +45,7 @@ class KoreanPlateRecognizerTest {
     }
 
     @Test
-    fun `misread as a different non-whitelisted syllable still digit-matches even unrepaired`() {
+    fun `misread vowel and final consonant are repaired by preserved initial`() {
         // "너" (ㄴ+ㅓ) misread as "년" (ㄴ+ㅕ+ㄴ) — a different vowel plus a trailing consonant,
         // not just a jongseong-only variant, so no repair rule recovers the exact character.
         // The strict pattern rejects it since "년" isn't a real plate designation character;
@@ -53,16 +53,46 @@ class KoreanPlateRecognizerTest {
         // digitsOnly() still lets the DB lookup find the right car regardless.
         assertNull(KoreanPlateRecognizer.extractPlateNumber("56년9876"))
         val result = KoreanPlateRecognizer.extractPlateNumberLenient("56년9876")
-        assertEquals("56년9876", result)
+        assertEquals("56너9876", result)
         assertEquals("569876", KoreanPlateRecognizer.digitsOnly(result!!))
     }
 
     @Test
-    fun `misread as bare Latin letter lookalike is repaired to the real syllable`() {
-        // "너" misread as a single Latin letter "L" instead of splitting into jamo+digit.
+    fun `ambiguous Latin letter is not guessed as a specific Hangul syllable`() {
         val result = KoreanPlateRecognizer.extractPlateNumberLenient("56L9876")
-        assertEquals("56너9876", result)
+        assertEquals("56L9876", result)
         assertEquals("569876", KoreanPlateRecognizer.digitsOnly(result!!))
+    }
+
+    @Test
+    fun `compatibility jamo are composed into reo`() {
+        assertEquals("154러7070", KoreanPlateRecognizer.extractPlateNumberLenient("154ㄹㅓ7070"))
+    }
+
+    @Test
+    fun `compatibility jamo are composed into ra`() {
+        assertEquals("154라7070", KoreanPlateRecognizer.extractPlateNumberLenient("154ㄹㅏ7070"))
+    }
+
+    @Test
+    fun `jamo plus vertical stroke restores reo`() {
+        assertEquals("154러7070", KoreanPlateRecognizer.extractPlateNumberLenient("154ㄹ17070"))
+    }
+
+    @Test
+    fun `extra final consonant is removed from reo`() {
+        assertEquals("154러7070", KoreanPlateRecognizer.extractPlateNumberLenient("154럭7070"))
+    }
+
+    @Test
+    fun `similar vowel OCR error is restored only with same initial`() {
+        assertEquals("154러7070", KoreanPlateRecognizer.extractPlateNumberLenient("154려7070"))
+    }
+
+    @Test
+    fun `NFD Hangul is normalized before matching`() {
+        val decomposed = java.text.Normalizer.normalize("154러7070", java.text.Normalizer.Form.NFD)
+        assertEquals("154러7070", KoreanPlateRecognizer.extractPlateNumberLenient(decomposed))
     }
 
     @Test

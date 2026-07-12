@@ -26,11 +26,12 @@ class PlateRepository(context: Context) {
         // 가능한 숫자 키 해석을 모두 시도한다.
         val keys = KoreanPlateRecognizer.candidateDigitKeys(trimmed)
         if (keys.first().length < 6) return null
-        return dao.getAllPlatesOnce().firstOrNull { entity ->
+        val matches = dao.getAllPlatesOnce().filter { entity ->
             val entityKey = KoreanPlateRecognizer.digitsOnly(entity.plateNumber)
             keys.any { it == entityKey } &&
                 // 양쪽 다 유효한 한글로 읽혔는데 글자가 다르면 숫자가 같아도 다른 차량
                 KoreanPlateRecognizer.isMiddleCompatible(trimmed, entity.plateNumber)
         }
+        return matches.singleOrNull()
     }
 }

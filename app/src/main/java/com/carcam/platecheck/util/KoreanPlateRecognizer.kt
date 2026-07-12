@@ -1,6 +1,7 @@
 package com.carcam.platecheck.util
 
 import java.util.regex.Pattern
+import java.text.Normalizer
 
 object KoreanPlateRecognizer {
     // 대한민국 번호판 용도기호로 실제 쓰이는 한글만 모은 화이트리스트.
@@ -24,7 +25,7 @@ object KoreanPlateRecognizer {
     // 낱자모(ㄴ)로 읽히는 경우까지 잡아서 교정 단계로 넘기기 위함이다.
     // 단 한글/자모/라틴만 허용 — '-' 같은 구분 기호까지 허용하면 전화번호("67-5736")가
     // 번호판으로 오검출되는 것을 실측으로 확인했다.
-    private val PLATE_SHAPE = Pattern.compile("([0-9]{2,3})([가-힣ㄱ-ㅎA-Za-z]{1,3})([0-9]{4})")
+    private val PLATE_SHAPE = Pattern.compile("([0-9]{2,3})([가-힣ㄱ-ㅎㅏ-ㅣA-Za-z]{1,3})([0-9]{4})")
 
     // 가운데 한글이 통째로 소실되거나('러'→없음) 숫자로 오인식된('러'→'4', '조'→'2') 경우
     // 남는 것은 순수 숫자 7~8자리 연속열이다. 7자리 = 앞3+뒤4(소실) 또는 앞2+오인식1+뒤4,
@@ -48,7 +49,6 @@ object KoreanPlateRecognizer {
 
     // 한글과 모양이 비슷해 자주 오인식되는 라틴 문자 (단독 1글자로 읽힌 경우).
     private val LATIN_LOOKALIKE = mapOf(
-        'L' to '너', 'l' to '너',   // ㄴ+세로획이 L로 뭉개진 경우
         'U' to '우',
         'O' to '오', 'o' to '오', 'Q' to '오',
         'H' to '허'
@@ -57,8 +57,13 @@ object KoreanPlateRecognizer {
     // 두 글자 이상으로 쪼개져 읽히는 대표 사례 (소문자로 정규화해서 대조).
     private val MULTI_CHAR_LOOKALIKE = mapOf(
         "of" to '아',   // ㅇ+ㅏ가 O+f로 분리 인식
-        "lf" to '너',
         "ol" to '어'
+    )
+
+    private val CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+    private val JUNGSEONG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+    private val VOWEL_FAMILIES = listOf(
+        setOf('ㅏ', 'ㅑ'), setOf('ㅓ', 'ㅕ'), setOf('ㅗ', 'ㅛ'), setOf('ㅜ', 'ㅠ')
     )
 
     fun extractPlateNumber(text: String): String? {
@@ -124,16 +129,42 @@ object KoreanPlateRecognizer {
 
     // 오인식된 가운데 토큰을 화이트리스트 문자로 교정. 불가능하면 null.
     private fun repairMiddle(token: String): Char? {
+        composeCompatibilityJamo(token)?.let { if (it in VALID_MIDDLE) return it }
         if (token.length == 1) {
             val c = token[0]
             if (c in VALID_MIDDLE) return c
             // '년'→'너': 받침이 덧붙어 읽힌 경우 받침을 떼고 재검사
             stripJongseong(c)?.let { if (it in VALID_MIDDLE) return it }
+            repairSimilarHangul(c)?.let { return it }
             LATIN_LOOKALIKE[c]?.let { return it }
             JAMO_TO_EO[c]?.let { return it }
             return null
         }
         return MULTI_CHAR_LOOKALIKE[token.lowercase()]
+    }
+
+    private fun composeCompatibilityJamo(token: String): Char? {
+        if (token.length != 2) return null
+        val choseongIndex = CHOSEONG.indexOf(token[0])
+        val jungseongIndex = JUNGSEONG.indexOf(token[1])
+        if (choseongIndex < 0 || jungseongIndex < 0) return null
+        return ('가'.code + (choseongIndex * 21 + jungseongIndex) * 28).toChar()
+    }
+
+    private fun repairSimilarHangul(c: Char): Char? {
+        if (c !in '가'..'힣') return null
+        val offset = c.code - '가'.code
+        val initial = offset / (21 * 28)
+        val vowel = (offset % (21 * 28)) / 28
+        val vowelChar = JUNGSEONG[vowel]
+        val family = VOWEL_FAMILIES.firstOrNull { vowelChar in it } ?: return null
+        val candidates = VALID_MIDDLE.filter { candidate ->
+            val candidateOffset = candidate.code - '가'.code
+            val candidateInitial = candidateOffset / (21 * 28)
+            val candidateVowel = (candidateOffset % (21 * 28)) / 28
+            candidateInitial == initial && JUNGSEONG[candidateVowel] in family
+        }
+        return candidates.singleOrNull()
     }
 
     // 받침(종성)이 있는 음절이면 받침을 뗀 음절을 반환. 예: 년→너, 곤→고
@@ -177,5 +208,6 @@ object KoreanPlateRecognizer {
                SPECIAL_PATTERN.matcher(cleaned).matches()
     }
 
-    private fun clean(text: String) = text.trim().replace(" ", "").replace("\n", "")
+    private fun clean(text: String) = Normalizer.normalize(text, Normalizer.Form.NFC)
+        .filterNot { it.isWhitespace() }
 }

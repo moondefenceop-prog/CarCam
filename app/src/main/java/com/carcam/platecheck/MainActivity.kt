@@ -20,7 +20,9 @@ import androidx.core.view.isVisible
 import com.carcam.platecheck.databinding.ActivityMainBinding
 import com.carcam.platecheck.ui.MainViewModel
 import com.carcam.platecheck.util.ImageUtils
+import com.carcam.platecheck.util.KoreanPlateRecognizer
 import com.carcam.platecheck.util.PlateOcrEngine
+import com.carcam.platecheck.util.PlateGlyphTemplateMatcher
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
@@ -197,10 +199,31 @@ class MainActivity : AppCompatActivity() {
         activeJobs.incrementAndGet()
         recognizer.process(image)
             .addOnSuccessListener { visionText ->
-                val direct = PlateOcrEngine.extractPlates(visionText)
+                var direct = PlateOcrEngine.extractPlates(visionText)
                     .mapNotNull { (box, text) -> box?.let { it to text } }
 
                 if (direct.isNotEmpty()) {
+                    // ML Kit sometimes drops the usage Hangul or reads it as a digit (러 -> empty/4).
+                    // Only for such numeric-only candidates, inspect the actual middle glyph image.
+                    if (direct.any { (_, text) -> text.none { it in '가'..'힣' } }) {
+                        val uprightBitmap = runCatching {
+                            ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation)
+                        }.getOrNull()
+                        if (uprightBitmap != null) {
+                            direct = direct.map { (box, candidate) ->
+                                val digits = KoreanPlateRecognizer.digitsOnly(candidate)
+                                if (candidate.none { it in '가'..'힣' } && digits.length in 6..8) {
+                                    val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
+                                    val match = PlateGlyphTemplateMatcher.matchModernPlate(
+                                        uprightBitmap, box, leading
+                                    )
+                                    if (match != null && PlateGlyphTemplateMatcher.isConfident(match)) {
+                                        box to (digits.take(leading) + match.character + digits.takeLast(4))
+                                    } else box to candidate
+                                } else box to candidate
+                            }
+                        }
+                    }
                     imageProxy.close()
                     handleDetections(direct, visibleRegion)
                     activeJobs.decrementAndGet()
