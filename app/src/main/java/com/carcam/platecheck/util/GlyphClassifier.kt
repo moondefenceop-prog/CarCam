@@ -76,18 +76,23 @@ object GlyphClassifier {
 
     private fun runOne(itp: Interpreter, bitmap: Bitmap, left: Int, top: Int, right: Int, bottom: Int): Result? {
         val w = right - left; val h = bottom - top
-        // Nearest-neighbour resample the grayscale slot into SIZExSIZE, collecting stats for standardization.
+        if (w < 1 || h < 1) return null
+        // Bilinear (averaging) downscale to SIZExSIZE — must match training's cv2.resize. Plain
+        // nearest-neighbour sampling aliases high-res crops (e.g. portrait frames), distorting the
+        // ㅓ tick into ㅗ (러→로); averaging preserves the stroke shape.
+        val cropped = Bitmap.createBitmap(bitmap, left, top, w, h)
+        val scaled = Bitmap.createScaledBitmap(cropped, SIZE, SIZE, true)
+        val px = IntArray(SIZE * SIZE)
+        scaled.getPixels(px, 0, SIZE, 0, 0, SIZE, SIZE)
+        if (scaled != cropped) scaled.recycle()
+        cropped.recycle()
+
         val gray = FloatArray(SIZE * SIZE)
         var sum = 0.0; var sumSq = 0.0
-        for (oy in 0 until SIZE) {
-            val sy = top + oy * h / SIZE
-            for (ox in 0 until SIZE) {
-                val sx = left + ox * w / SIZE
-                val c = bitmap.getPixel(sx, sy)
-                val g = (Color.red(c) * 30 + Color.green(c) * 59 + Color.blue(c) * 11) / 100f
-                gray[oy * SIZE + ox] = g
-                sum += g; sumSq += g.toDouble() * g
-            }
+        for (i in px.indices) {
+            val c = px[i]
+            val g = (Color.red(c) * 30 + Color.green(c) * 59 + Color.blue(c) * 11) / 100f
+            gray[i] = g; sum += g; sumSq += g.toDouble() * g
         }
         val n = SIZE * SIZE
         val mean = (sum / n).toFloat()
