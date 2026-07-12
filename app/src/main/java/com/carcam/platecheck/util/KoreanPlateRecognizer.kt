@@ -62,8 +62,11 @@ object KoreanPlateRecognizer {
 
     private val CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
     private val JUNGSEONG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+    // ㅣ가 ㅓ 계열에 함께 묶여 있는 이유: 번호판 서체의 ㅓ는 세로획에 붙은 가로 획(뿔)이 짧아
+    // ML Kit이 이를 놓치고 ㅣ로 읽는 경우가 많다(러→리, 서→시, 저→지 …). 번호판 용도기호에는
+    // ㅣ모음 글자가 하나도 없으므로, 자음+ㅣ로 읽혔다면 같은 자음의 ㅓ열 글자로 교정하는 것이 안전하다.
     private val VOWEL_FAMILIES = listOf(
-        setOf('ㅏ', 'ㅑ'), setOf('ㅓ', 'ㅕ'), setOf('ㅗ', 'ㅛ'), setOf('ㅜ', 'ㅠ')
+        setOf('ㅏ', 'ㅑ'), setOf('ㅓ', 'ㅕ', 'ㅣ'), setOf('ㅗ', 'ㅛ'), setOf('ㅜ', 'ㅠ')
     )
 
     fun extractPlateNumber(text: String): String? {

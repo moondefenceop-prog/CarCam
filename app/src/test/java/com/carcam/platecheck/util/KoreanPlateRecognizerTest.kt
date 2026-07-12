@@ -144,4 +144,15 @@ class KoreanPlateRecognizerTest {
     fun `no match when digits are insufficient`() {
         assertNull(KoreanPlateRecognizer.extractPlateNumberLenient("1가2345"))
     }
+
+    @Test
+    fun `consonant plus ㅣ is repaired to the ㅓ-column usage char`() {
+        // ML Kit drops the ㅓ's short horizontal tick and reads the plate glyph as consonant+ㅣ.
+        // No usage char has a ㅣ vowel, so these must map to the same consonant's ㅓ-column char.
+        assertEquals("154러7070", KoreanPlateRecognizer.extractPlateNumberLenient("154리7070"))
+        assertEquals("12서3456", KoreanPlateRecognizer.extractPlateNumberLenient("12시3456"))
+        assertEquals("12저3456", KoreanPlateRecognizer.extractPlateNumberLenient("12지3456"))
+        assertEquals("12너3456", KoreanPlateRecognizer.extractPlateNumberLenient("12니3456"))
+        assertEquals("12어3456", KoreanPlateRecognizer.extractPlateNumberLenient("12이3456"))
+    }
 }

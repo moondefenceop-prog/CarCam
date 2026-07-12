@@ -150,6 +150,98 @@ class PlateRecognitionBenchmarkTest {
      * preprocessing. Logs what each strategy reads so we can find one that recovers e.g. '러'.
      * Run: gradle connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.carcam.platecheck.PlateRecognitionBenchmarkTest#experimentReOcr
      */
+    /**
+     * Feeds a CLEANED, full-plate crop (not the tiny glyph slot) to ML Kit: contrast-stretch,
+     * adaptive binarization, and Sobel. Tests whether binarizing the plate before OCR recovers '러'.
+     * Run: adb ... class=...#experimentBinarizedReOcr
+     */
+    @Ignore("Diagnostic only; run explicitly. Showed ML Kit itself never reads this '러' (reads '리'/digit).")
+    @Test
+    fun experimentBinarizedReOcr() {
+        val context = InstrumentationRegistry.getInstrumentation().context
+        val cases = loadLabeledCases(context).filter { it.second == "154러7070" }
+        val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+        try {
+            val warmup = Bitmap.createBitmap(100, 60, Bitmap.Config.ARGB_8888)
+            runCatching { Tasks.await(recognizer.process(InputImage.fromBitmap(warmup, 0)), 30, TimeUnit.SECONDS) }
+            for ((file, _) in cases) {
+                val fullRes = loadBitmapWithExifRotation(context, "plates/$file")
+                val pass1 = resizeToMaxDim(fullRes, 960)
+                val scale = fullRes.width.toFloat() / pass1.width
+                val t1 = Tasks.await(recognizer.process(InputImage.fromBitmap(pass1, 0)), 15, TimeUnit.SECONDS)
+                val box = (PlateOcrEngine.extractPlates(t1).mapNotNull { it.first } + PlateOcrEngine.findAmbiguousDigitBlocks(t1))
+                    .maxByOrNull { it.width() } ?: continue
+                val fr = Rect((box.left*scale).toInt(),(box.top*scale).toInt(),(box.right*scale).toInt(),(box.bottom*scale).toInt())
+                val crop = ImageUtils.cropAndUpscale(fullRes, fr, targetMaxDim = 1000)
+                val gray = toGray(crop)
+
+                val variants = linkedMapOf<String, Bitmap>(
+                    "contrastDenoise" to stretchAndBlur(gray),
+                    "adaptiveBinary" to adaptiveBinary(stretchAndBlur(gray)),
+                    "adaptiveBinaryNoBlur" to adaptiveBinary(gray)
+                )
+                for ((name, bmp) in variants) {
+                    val t2 = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 15, TimeUnit.SECONDS)
+                    val plates = PlateOcrEngine.extractPlates(t2)
+                    val strict = plates.any { KoreanPlateRecognizer.extractPlateNumber(it.second) != null }
+                    // Also try the TEMPLATE matcher on this (cleaned) bitmap, using ML Kit's digit box.
+                    var tmpl = "n/a"
+                    val pbox = plates.mapNotNull { it.first }.maxByOrNull { it.width() }
+                    if (pbox != null) {
+                        val digits = KoreanPlateRecognizer.digitsOnly(plates.first { it.first == pbox }.second)
+                        if (digits.length in 6..8) {
+                            val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
+                            val m = PlateGlyphTemplateMatcher.matchModernPlate(bmp, pbox, leading)
+                            tmpl = "$m confident=${m != null && PlateGlyphTemplateMatcher.isConfident(m)}"
+                        }
+                    }
+                    Log.i(TAG, "BINREOCR file=$file [$name] raw=[${t2.text.replace("\n","|")}] plates=[${plates.joinToString{it.second}}] strict러=$strict TEMPLATE=$tmpl")
+                }
+            }
+        } finally { recognizer.close() }
+    }
+
+    private fun toGray(src: Bitmap): Bitmap {
+        val bmp = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+        Canvas(bmp).drawBitmap(src, 0f, 0f, Paint().apply { colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) })
+        return bmp
+    }
+
+    private fun stretchAndBlur(gray: Bitmap): Bitmap {
+        val w = gray.width; val h = gray.height
+        val px = IntArray(w*h); gray.getPixels(px,0,w,0,0,w,h)
+        val lum = IntArray(w*h) { android.graphics.Color.red(px[it]) }
+        val hist = IntArray(256); for (v in lum) hist[v]++
+        val cut = (w*h*0.02).toInt(); var lo=0; var hi=255; var acc=0
+        for (t in 0..255){acc+=hist[t]; if(acc>cut){lo=t;break}}; acc=0
+        for (t in 255 downTo 0){acc+=hist[t]; if(acc>cut){hi=t;break}}
+        val scale = if (hi>lo) 255f/(hi-lo) else 1f
+        val stretched = IntArray(w*h){ (((lum[it]-lo)*scale).toInt()).coerceIn(0,255) }
+        // 3x3 box blur
+        val out = IntArray(w*h)
+        for (y in 0 until h) for (x in 0 until w){ var s=0; var n=0
+            for (dy in -1..1) for (dx in -1..1){ val ny=y+dy; val nx=x+dx; if(ny in 0 until h && nx in 0 until w){s+=stretched[ny*w+nx];n++}}
+            val v=s/n; out[y*w+x]=(0xFF shl 24) or (v shl 16) or (v shl 8) or v }
+        return Bitmap.createBitmap(out,w,h,Bitmap.Config.ARGB_8888)
+    }
+
+    private fun adaptiveBinary(gray: Bitmap): Bitmap {
+        val w=gray.width; val h=gray.height
+        val px=IntArray(w*h); gray.getPixels(px,0,w,0,0,w,h)
+        val g=IntArray(w*h){ android.graphics.Color.red(px[it]) }
+        val integral=LongArray((w+1)*(h+1))
+        for (y in 0 until h) for (x in 0 until w) integral[(y+1)*(w+1)+(x+1)]=g[y*w+x]+integral[y*(w+1)+(x+1)]+integral[(y+1)*(w+1)+x]-integral[y*(w+1)+x]
+        val r=maxOf(8, minOf(w,h)/12); val c=10
+        val out=IntArray(w*h)
+        for (y in 0 until h) for (x in 0 until w){
+            val x0=maxOf(0,x-r); val y0=maxOf(0,y-r); val x1=minOf(w-1,x+r); val y1=minOf(h-1,y+r)
+            val area=(x1-x0+1)*(y1-y0+1)
+            val sum=integral[(y1+1)*(w+1)+(x1+1)]-integral[y0*(w+1)+(x1+1)]-integral[(y1+1)*(w+1)+x0]+integral[y0*(w+1)+x0]
+            val v=if(g[y*w+x] < sum/area - c) 0 else 255
+            out[y*w+x]=(0xFF shl 24) or (v shl 16) or (v shl 8) or v }
+        return Bitmap.createBitmap(out,w,h,Bitmap.Config.ARGB_8888)
+    }
+
     @Ignore("Diagnostic only; run explicitly. Proved ML Kit re-OCR cannot recover this '러' under moire.")
     @Test
     fun experimentReOcr() {
