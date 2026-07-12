@@ -169,15 +169,22 @@ class PlateRecognitionBenchmarkTest {
                 val label = expected.firstOrNull { it in '가'..'힣' } ?: continue
                 val bmp = resizeToMaxDim(loadBitmapWithExifRotation(context, "plates/$file"), 960)
                 val text = Tasks.await(recognizer.process(InputImage.fromBitmap(bmp, 0)), 15, TimeUnit.SECONDS)
-                val box = (PlateOcrEngine.extractPlates(text).mapNotNull { it.first } +
-                    PlateOcrEngine.findAmbiguousDigitBlocks(text)).maxByOrNull { it.width() } ?: continue
-                val cand = PlateOcrEngine.extractPlates(text).maxByOrNull { (it.first?.width() ?: 0) }?.second ?: ""
-                val digits = KoreanPlateRecognizer.digitsOnly(cand).ifEmpty { KoreanPlateRecognizer.digitsOnly(expected) }
-                if (digits.length !in 6..8) continue
-                val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
-                val totalSlots = leading + 5
+                val plates = PlateOcrEngine.extractPlates(text).mapNotNull { (b, t) -> b?.let { it to t.filterNot { c -> c.isWhitespace() } } }
+                if (plates.isEmpty()) continue
+                // Prefer the plate block that actually contains a Hangul (full read); else widest.
+                val (box, read) = plates.firstOrNull { it.second.any { c -> c in '가'..'힣' } }
+                    ?: plates.maxByOrNull { it.first.width() }!!
+                val hIdx = read.indexOfFirst { it in '가'..'힣' }
+                val (slotIndex, totalSlots) = if (hIdx >= 0) {
+                    hIdx to read.length
+                } else {
+                    val digits = KoreanPlateRecognizer.digitsOnly(read)
+                    if (digits.length !in 6..8) continue
+                    val leading = digits.length - 4 - if (digits.length == 8) 1 else 0
+                    leading to (leading + 5)
+                }
                 val pitch = box.width().toFloat() / totalSlots
-                val baseCx = box.left + (leading + 0.5f) * pitch
+                val baseCx = box.left + (slotIndex + 0.5f) * pitch
                 val top = (box.top - box.height() * 0.08f).toInt().coerceAtLeast(0)
                 val bottom = (box.bottom + box.height() * 0.08f).toInt().coerceAtMost(bmp.height)
                 var i = 0

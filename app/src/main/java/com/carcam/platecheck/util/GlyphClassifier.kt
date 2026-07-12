@@ -48,13 +48,30 @@ object GlyphClassifier {
 
     fun isReady() = interpreter != null
 
-    /** Classifies the usage glyph on a plate line. [leadingDigits] is the count before the Hangul. */
+    /**
+     * Numeric-only path: ML Kit dropped the Hangul, so the box spans (leadingDigits + 1 + 4) equal
+     * slots and the Hangul sits at index [leadingDigits].
+     */
     fun classify(bitmap: Bitmap, lineBox: Rect, leadingDigits: Int): Result? {
+        if (leadingDigits !in 2..3) return null
+        return classifyAt(bitmap, lineBox, leadingDigits, leadingDigits + 5)
+    }
+
+    /**
+     * Full-read path: ML Kit read the Hangul (possibly wrong), so [readLength] characters tightly
+     * fill the box and the Hangul is at [hangulIndex]. Locating it from the actual read is far more
+     * robust than width estimation when ML Kit splits the line into blocks.
+     */
+    fun classifyInRead(bitmap: Bitmap, lineBox: Rect, hangulIndex: Int, readLength: Int): Result? {
+        if (hangulIndex < 0 || readLength < 5 || hangulIndex >= readLength) return null
+        return classifyAt(bitmap, lineBox, hangulIndex, readLength)
+    }
+
+    private fun classifyAt(bitmap: Bitmap, lineBox: Rect, slotIndex: Int, totalSlots: Int): Result? {
         val itp = interpreter ?: return null
-        if (leadingDigits !in 2..3 || lineBox.width() <= 0 || lineBox.height() <= 0) return null
-        val totalSlots = leadingDigits + 5
+        if (totalSlots <= 0 || lineBox.width() <= 0 || lineBox.height() <= 0) return null
         val slotPitch = lineBox.width().toFloat() / totalSlots
-        val baseCenterX = lineBox.left + (leadingDigits + 0.5f) * slotPitch
+        val baseCenterX = lineBox.left + (slotIndex + 0.5f) * slotPitch
         val top = (lineBox.top - lineBox.height() * 0.08f).toInt().coerceAtLeast(0)
         val bottom = (lineBox.bottom + lineBox.height() * 0.08f).toInt().coerceAtMost(bitmap.height)
         if (bottom - top < 8) return null
