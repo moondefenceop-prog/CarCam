@@ -37,6 +37,18 @@ Tried and NOT shipped (all underperformed the 80% baseline on real degraded fram
 - **Mixed system+real fonts** (`train_mixed.py`, 55% real plate glyphs / 45% system fonts, same
   framing as the shipped model): 63.2% vs the baseline's 68.4% on the same set — still a net
   regression. Real-font shapes help clean glyphs but hurt the moiré-degraded frames.
+- **Real font + explicit moiré/JPEG degradation augmentation** (to model screen-photo interference):
+  made it *worse* — on `experimentCnnMiddle`, CNN-picks-middle fell to 9/31 vs ML Kit 21/31. Heavy
+  synthetic degradation destroys the fine features the model needs to discriminate the glyph.
+
+**Global "always use the CNN for the middle" is not viable with current data/methods.** Diagnosis
+of the failures: 호 fails on *localization* (ML Kit drops the leading digit → crop lands on a
+digit), but 머/바/조/너 fail on *classification* — the crop is fine but the model can't read the
+real plate-font glyph. No training variant (system font, real font, reject class, moiré aug) got
+the CNN's real-plate middle accuracy above ML Kit's (~50% vs ~70%). The CNN stays in the narrow
+numeric-only fallback (where any recovery beats bare digits), not global correction. Beating this
+needs a large *real* labeled degraded dataset (plates photographed individually in real conditions),
+which synthetic degradation does not substitute for.
 
 Key finding: the bottleneck is **degradation** (moiré / blur / small, low-res crops), not glyph
 shape. Clean plate-font renders + augmentation don't reproduce real screen-photo moiré, so global
