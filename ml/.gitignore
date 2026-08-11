@@ -1,3 +1,7 @@
 *.keras
 glyph_preview.png
 __pycache__/
+kor_plate/
+chaindump/
+v2_preview.png
+glyph_cnn_slotcrop.tflite

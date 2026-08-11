@@ -56,9 +56,40 @@ middle-correction and full 40-glyph reliability need a **real degraded labeled d
 (many plates, many conditions) — not just the font. `harvestGlyphs` (androidTest) collects such
 crops from the app pipeline; combine those with `train_realfont.py` glyphs once enough are gathered.
 
+## Offline real-plate harness + the slot-crop framing fix (2026-08)
+`eval_real.py` evaluates any .tflite candidate on the labeled androidTest plate images
+**without a device**: it finds the plate text line as a horizontal chain of similar-height
+dark components (digit-dominated aspect, bright background — approximating ML Kit's line box),
+applies the app's exact slot geometry + sweep, and reports per-image prediction/confidence
+plus a "valid-localization" accuracy that excludes images where the harness's own plate
+detection is known-bad (background-sign locks, a screenshot, a two-line plate).
+
+Findings from it:
+- **Confidence gating is useless**: wrong predictions come at softmax 1.000 as often as right
+  ones (batch of 배/호 errors at conf ≥0.99). A "trust CNN only when confident" override has
+  no threshold that helps.
+- **Framing mismatch found**: the app feeds the CNN slot crops (half-width 0.5–0.62 pitch,
+  ±0.35-pitch jitter) that contain edges of the neighboring digits; every prior trainer
+  rendered one centered glyph on a blank canvas. `train_slotcrop.py` composes a full
+  [digits][GLYPH][digits] line (real plate font + system fonts + real digit images), augments
+  the line, then crops with the app's exact distribution. Valid-localization accuracy:
+  **20/27 vs the shipped model's 18/27** — the first variant to match/beat ML Kit's middle
+  accuracy on this set, and it holds all the moiré 러 frames. A 1500/class rerun scored 19/27
+  and regressed 러→보, so the 900/class weights are kept (seed variance is real at this scale;
+  candidate saved as `glyph_cnn_slotcrop.tflite`, not committed). Not yet deployed: needs the
+  on-device benchmark (phone) to confirm no end-to-end regression before replacing
+  `app/src/main/assets/glyph_cnn.tflite`.
+- Probability-sum voting across the sweep (instead of keeping the max-confidence crop) helps
+  the shipped model (18→20) but not the slot-crop model (20→19); cross-model ensembling adds
+  nothing. Not worth app changes on its own.
+
 ## Files (extra)
 - `train_realfont.py` — trains on real plate-font glyph images + real digits (reject class).
   Requires `KOR_PLATE_REPO` env var or a `kor_plate/` clone of kade93/kor_license_plate_generator.
+- `train_slotcrop.py` — trains on simulated slot crops (see above). `N_PER_CLASS` env var
+  scales data (default 1500/class). Requires the `kor_plate/` clone.
+- `eval_real.py [model.tflite]` — offline real-plate eval harness (see above); defaults to
+  the shipped app asset. Writes localization visualizations to `chaindump/`.
 - `make_samples.py` — renders 50 diverse plates (all 39 usage glyphs, 2/3-digit formats) in the
   real plate font as PNGs + a contact sheet + `gallery.html` (one plate per screen), for manual
   recognition testing. Photograph plates **individually** (fill the frame), not the contact sheet.
