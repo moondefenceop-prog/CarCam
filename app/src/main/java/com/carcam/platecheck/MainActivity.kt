@@ -74,6 +74,14 @@ class MainActivity : AppCompatActivity() {
     // 용도기호 분류기(CNN) 채택 신뢰도 임계값. 미달 시 템플릿 매처로 폴백.
     private val GLYPH_CONFIDENCE = 0.5f
 
+    // ML Kit이 읽은 유효 한글을 뒤집을 때의 임계값. 위보다 높다 — 저쪽은 숫자만 남은 상태라
+    // 무엇이든 시도할 가치가 있지만, 여기서는 대개 맞는 판독을 갈아치우는 것이기 때문이다.
+    private val OVERRIDE_CONFIDENCE = 0.90f
+
+    // 판독 문자열 → 검증/교정된 문자열. 같은 번호판이 초당 여러 번 들어오는데 이 경로는
+    // 비트맵 변환을 동반하므로, 프레임마다 다시 판단하면 가장 무거운 단계가 상시 돌게 된다.
+    private val verifiedMiddle = mutableMapOf<String, String>()
+
     // 안정화: 1프레임만 보여도 즉시 표시 (인식률 우선)
     private val CONFIRM_THRESHOLD = 1
     private val plateConfirmCount = mutableMapOf<String, Int>()
@@ -281,6 +289,24 @@ class MainActivity : AppCompatActivity() {
                     .mapNotNull { (box, text) -> box?.let { it to text } }
 
                 if (direct.isNotEmpty()) {
+                    // ML Kit also misreads the glyph as a *different valid* one (버 -> 허), and
+                    // that used to be accepted silently because the classifier only ran when no
+                    // Hangul was read at all. Verify those too — on the labelled set the crop
+                    // pipeline reads 31/31, well above ML Kit's own middle accuracy.
+                    if (direct.any { (_, text) -> text.any { it in '가'..'힣' } &&
+                            !verifiedMiddle.containsKey(text) }) {
+                        val bmp = runCatching {
+                            ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation)
+                        }.getOrNull()
+                        if (bmp != null) direct = direct.map { (box, candidate) ->
+                            box to verifyMiddle(bmp, box, candidate)
+                        }
+                    } else {
+                        direct = direct.map { (box, candidate) ->
+                            box to (verifiedMiddle[candidate] ?: candidate)
+                        }
+                    }
+
                     // ML Kit sometimes drops the usage Hangul or reads it as a digit (러 -> empty/4).
                     // Only for such numeric-only candidates, inspect the actual middle glyph image.
                     if (direct.any { (_, text) -> text.none { it in '가'..'힣' } }) {
@@ -508,6 +534,36 @@ class MainActivity : AppCompatActivity() {
                 tv.visibility = View.GONE
             }
         }
+    }
+
+    /**
+     * Check the usage glyph ML Kit read against the image, and correct it when the classifier
+     * is confident and disagrees.
+     *
+     * Only overrides above [OVERRIDE_CONFIDENCE], which is stricter than the threshold used to
+     * recover a glyph ML Kit dropped: there, any answer beats bare digits, whereas here a
+     * wrong override would replace a reading that is usually right.
+     *
+     * Results are cached per read string. The camera sees the same plate many times a second
+     * and this path converts a frame to a bitmap, so re-deciding every frame would put the
+     * heaviest step of the pipeline on the hot path.
+     */
+    private fun verifyMiddle(bitmap: android.graphics.Bitmap, box: Rect, candidate: String): String {
+        verifiedMiddle[candidate]?.let { return it }
+        val idx = candidate.indexOfFirst { it in '가'..'힣' }
+        if (idx < 0 || candidate.length < 5) return candidate
+        val result = GlyphClassifier.classifyInRead(bitmap, box, idx, candidate.length)
+        val corrected = if (result != null &&
+            result.confidence >= OVERRIDE_CONFIDENCE &&
+            result.character != candidate[idx]
+        ) {
+            val fixed = candidate.substring(0, idx) + result.character + candidate.substring(idx + 1)
+            Log.i("CarCam", "middle corrected: $candidate -> $fixed (${result.confidence})")
+            fixed
+        } else candidate
+        if (verifiedMiddle.size > 64) verifiedMiddle.clear()
+        verifiedMiddle[candidate] = corrected
+        return corrected
     }
 
     @androidx.camera.core.ExperimentalGetImage
