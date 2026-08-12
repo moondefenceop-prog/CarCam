@@ -97,6 +97,13 @@ Two causes, both fixed in `glyph_crop.py`:
    (measured: the crop centre landing 0.66 pitch off). `snap_to_glyph` instead segments on the
    **valleys** of the ink profile about a half-pitch out on each side, which survives both.
 
+3. **The vertical margin was dragging the plate frame into the crop.** The slot was cropped
+   8% taller than the text line on each side, and that is exactly where the plate's border
+   sits. The model reads a full-width bar as a stroke: 나 + bar above = 다, 바 + bar below =
+   보 (confirmed from row ink profiles — the bottom three rows of the 바 crop were 100% ink).
+   Dropping the margin to zero is the single biggest win in this whole effort, **21/28 →
+   25/28**, fixing the tilted 호, 178호, 214머 and 392바 in one change.
+
 Result on the scored real-plate set (28 images, excluding harness-localization artefacts and
 one frame the user judged unreadable):
 
@@ -104,16 +111,31 @@ one frame the user judged unreadable):
 | --- | --- |
 | shipped model, equal-width slot + confidence sweep | 18/28 |
 | shipped model + valley snap | 16/28 |
-| **slot-crop model + valley snap** | **21/28** |
+| slot-crop model + valley snap (8% band margin) | 21/28 |
 | slot-crop model + valley snap + row tightening | 20/28 |
 | model retrained through the snap crop policy | 19/28 |
 | model retrained through snap + row tightening | 17/28 |
+| **slot-crop model + valley snap, zero band margin** | **25/28** |
+| …with row tightening | 23/28 |
+| …with test-time augmentation (shift/scale vote) | 24/28 |
+| shipped model, zero band margin | 21/28 |
+| snap-crop model, zero band margin | 22/28 |
 
 Note the pattern: **retraining to match a crop policy kept losing to the slot-crop model.**
 Val accuracy was 97–98% in every case, so synthetic validation says nothing about which one
-wins on real plates. Training variants are now hovering inside seed noise (19–21) — more
-synthetic retraining is not the lever. `snap_rows` (aspect normalisation for tilted plates)
-is implemented but **off by default**, having measured worse twice.
+wins on real plates. More synthetic retraining is not the lever — every remaining gain came
+from what the model is *shown*. `snap_rows` (aspect normalisation for tilted plates) and
+test-time augmentation are both implemented but **off by default**, each having measured worse.
+
+The three remaining scored failures are not classifier bugs:
+- `177호1336`, `177호1336_2` — the harness locks onto the wrong plate region (the app uses
+  ML Kit's box here, so these do not represent app behaviour).
+- `12나3456` — a genuinely worn, low-resolution truck plate. Verified that the crop is clean
+  and complete, that the plate-font assets are labelled correctly (`sk`=나, `ek`=다), and that
+  the model scores 37/40 on synthetic 나 without ever confusing it for 다. It is a domain gap
+  on that image, not a systematic weakness.
+- The two `nobox` images (`30고5445`, `63다6576`) are old-style plates the harness's line
+  finder does not detect at all.
 
 Deployment still needs the on-device benchmark: the app's slot geometry (`GlyphClassifier.kt`)
 uses the equal-width formula plus the confidence sweep that this work showed to be actively

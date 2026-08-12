@@ -137,7 +137,11 @@ for f in sorted(glob.glob(os.path.join(PLATES, "*.png"))):
         total = len(lead) + 5
         pitch = (R - L) / total
         base_cx = L + (len(lead) + 0.5) * pitch
-        top = max(0, int(T - (B - T) * 0.08)); bot = min(img.shape[0], int(B + (B - T) * 0.08))
+        # No vertical margin: the plate frame sits just outside the text line, and a widened
+        # band pulls that full-width bar into the crop, where the model reads it as a stroke
+        # (나 + bar above = 다, 바 + bar below = 보). Measured 21/28 at 0.08 vs 25/28 at 0.
+        BM = float(os.environ.get("BAND_MARGIN", "0.0"))
+        top = max(0, int(T - (B - T) * BM)); bot = min(img.shape[0], int(B + (B - T) * BM))
         snap = snap_to_glyph(img, top, bot, base_cx, pitch)
         if snap is not None:
             # Snap fixes the CENTRE only. The crop keeps the trained slot framing (a bit
@@ -148,7 +152,8 @@ for f in sorted(glob.glob(os.path.join(PLATES, "*.png"))):
             # most confident window actively selects the broken one.
             gcx = (snap[0] + snap[1]) / 2
             got = crop_for_model(img, top, bot, gcx, pitch,
-                                 float(os.environ.get("HALF_W", "0.62")))
+                                 float(os.environ.get("HALF_W", "0.62")),
+                                 os.environ.get("TIGHTEN_ROWS", "0") == "1")
             if got is None:
                 rows.append((name, mid, "?", 0.0, "nocrop")); continue
             sub, l, r = got
