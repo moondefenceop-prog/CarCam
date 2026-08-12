@@ -226,6 +226,19 @@ This is a check on the picture rather than a preference between classes, and it 
 self-validating: 머, 호, 바 and 아 stay correct throughout, which means the counter detection
 finds real holes where they exist. Scored set **30/30** (`HOLE_VETO=1`, default on).
 
+## Known separate problem: ML Kit's line box can omit the usage glyph
+On `10버7399_1.png` and `10버7399_2.png` — a tilted plate photographed off a monitor — ML Kit
+reports the text as `10허7399` but its bounding box covers only the tail of the plate, leaving
+the usage glyph outside the region entirely. Every stage downstream works inside that box, so
+no crop, deskew or classifier change can reach the glyph: the character is lost during
+*detection*, before classification begins.
+
+This is a different piece of work (recovering the true text line by re-collecting components
+beyond the reported box, as `eval_real.py` does) and is deliberately not mixed into the
+middle-glyph verification. The two frames stay in `app/src/androidTest/assets/plates/` as a
+record of the failure but are excluded from `MiddleVerificationTest` scoring, so they do not
+mask changes to the part being measured.
+
 ## Files (extra)
 - `train_realfont.py` — trains on real plate-font glyph images + real digits (reject class).
   Requires `KOR_PLATE_REPO` env var or a `kor_plate/` clone of kade93/kor_license_plate_generator.
