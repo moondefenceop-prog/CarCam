@@ -4,14 +4,19 @@ import android.content.Context
 import android.graphics.Bitmap
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
- * Collects frames the operator says were read wrongly, together with the correct plate.
+ * Collects frames the operator flags as misread.
  *
- * A misread that a person can see but the pipeline cannot is only actionable with the picture
- * *and* the right answer attached; without the label a captured frame is just another image.
- * Files are named after the correct plate, which is the same convention the offline evaluation
- * set uses, so a pulled capture drops straight into it and becomes a regression case.
+ * One tap, no typing: this is used one-handed at a barrier with a driver waiting, and the
+ * correct plate can be read off the picture afterwards by whoever analyses it. Asking for it
+ * at capture time buys nothing and costs the operator the moment they were trying to catch.
+ *
+ * What the app read is recorded instead — that is the part which cannot be recovered later,
+ * since a frame alone does not say what the pipeline made of it.
  */
 object CaptureStore {
 
@@ -27,22 +32,24 @@ object CaptureStore {
         dir(context).listFiles { f -> f.extension.equals("png", true) }?.size ?: 0
 
     /**
-     * Save [bitmap] labelled with [correctPlate], recording what the app had read.
-     * Returns null if writing failed — callers surface that rather than silently losing it.
+     * Save [bitmap] with what the app read. Returns null if writing failed — callers surface
+     * that rather than silently losing it.
      */
-    fun save(context: Context, bitmap: Bitmap, correctPlate: String, appRead: String): Saved? {
+    fun save(context: Context, bitmap: Bitmap, appRead: String): Saved? {
         // A recycled bitmap throws from compress() *after* the file exists, which is how empty
         // PNGs with no manifest row appeared. Refuse up front instead.
         if (bitmap.isRecycled) return null
         var created: File? = null
         return runCatching {
             val dir = dir(context)
-            // Same name pattern as the evaluation set: "154러7070_3.png". Suffix on collision so
-            // repeat captures of one plate become separate cases instead of overwriting.
-            val safe = correctPlate.replace(Regex("[\\\\/:*?\"<>|\\s]"), "")
-            var file = File(dir, "$safe.png")
+            // Named by time and by what the app read, never by a claimed answer: the file is
+            // evidence of a misreading, and calling it by the plate it is *supposed* to be
+            // would make a wrong reading look like ground truth once the folder is pulled.
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.KOREA).format(Date())
+            val safe = appRead.replace(Regex("[\\\\/:*?\"<>|\\s]"), "").ifEmpty { "none" }
+            var file = File(dir, "cap_${stamp}_$safe.png")
             var n = 1
-            while (file.exists()) file = File(dir, "${safe}_$n.png").also { n++ }
+            while (file.exists()) file = File(dir, "cap_${stamp}_${safe}_$n.png").also { n++ }
             created = file
             FileOutputStream(file).use {
                 check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) { "compress failed" }
@@ -51,10 +58,10 @@ object CaptureStore {
             val manifest = File(dir, MANIFEST)
             if (!manifest.exists()) {
                 // BOM so Excel opens the Hangul correctly.
-                manifest.writeText("﻿파일,정답,앱인식,시각\r\n", Charsets.UTF_8)
+                manifest.writeText("﻿파일,앱인식,시각\r\n", Charsets.UTF_8)
             }
             manifest.appendText(
-                "${file.name},$correctPlate,$appRead,${System.currentTimeMillis()}\r\n",
+                "${file.name},$appRead,${System.currentTimeMillis()}\r\n",
                 Charsets.UTF_8
             )
             Saved(file, count(context))
