@@ -12,6 +12,8 @@ import os, glob, sys, numpy as np, cv2
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 from PIL import Image, ImageDraw, ImageFont
 import tensorflow as tf
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from glyph_crop import binarize
 
 SC = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.join(SC, "kor_plate")
@@ -137,6 +139,11 @@ def sample(ci, rng):
     crop = canvas[top:bot, l:r]
     if crop.size==0: crop=canvas
     crop = photometric(crop, rng)
+    _bm = os.environ.get("BINARIZE","gray")
+    # "mix" trains one model on both views so either can be fed at inference,
+    # and their predictions can be averaged as a two-view ensemble.
+    if _bm == "mix": _bm = "gray" if rng.random() < 0.5 else "otsu"
+    crop = binarize(crop, _bm)
     g = cv2.resize(crop,(S,S),interpolation=cv2.INTER_AREA).astype(np.float32)
     return (g-g.mean())/(g.std()+1e-6)
 
@@ -172,5 +179,5 @@ model.fit(Xtr,Ytr,validation_data=(Xva,Yva),epochs=45,batch_size=128,
           callbacks=[tf.keras.callbacks.EarlyStopping(patience=6,restore_best_weights=True,monitor="val_accuracy")],verbose=2)
 print(f"val acc: {model.evaluate(Xva,Yva,verbose=0)[1]*100:.2f}%")
 tfl=tf.lite.TFLiteConverter.from_keras_model(model).convert()  # float32
-open(os.path.join(OUTDIR,"glyph_cnn_slotcrop.tflite"),"wb").write(tfl)
+open(os.path.join(OUTDIR, os.environ.get("OUT_NAME","glyph_cnn_slotcrop.tflite")),"wb").write(tfl)
 print("Saved glyph_cnn_slotcrop.tflite",len(tfl),"bytes")

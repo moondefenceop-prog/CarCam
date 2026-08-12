@@ -141,6 +141,45 @@ Deployment still needs the on-device benchmark: the app's slot geometry (`GlyphC
 uses the equal-width formula plus the confidence sweep that this work showed to be actively
 harmful, so porting `snap_to_glyph` into the app is the change to make next.
 
+## Binarisation, background trimming, and fixing plate detection (28/28)
+Continuing from the crop work above, three more findings took the scored set from 25/28 to
+**28/28** — every remaining error turned out to be preprocessing or plate detection, not the
+classifier.
+
+**Otsu binarisation, trained to match.** Feeding a binarised crop to a grey-trained model costs
+points, but training through the same binarisation does not: `BINARIZE=otsu` on
+`train_slotcrop.py` produced a model that reads the worn `12나3456` correctly (grey read it as
+다 at 0.97, on a crop verified clean). Adaptive-mean and illumination-flattened variants both
+scored lower. A model trained on a *mix* of grey and Otsu was much worse (20/28) — halving the
+data per representation beat the benefit of covering both. Ensembling a grey model with an Otsu
+model also failed (24/28): in each disputed image the wrong model was the more confident one.
+
+**Trim the background before binarising.** The text-line box is axis-aligned, so a tilted plate
+leaves wedges of dark scene inside the crop. Otsu is a single global threshold, so those wedges
+dominate it and the glyph nearly vanishes — that is what turned the tilted 호 into 나.
+`trim_dark_background` drops rows far darker than the plate face, and both the grey and Otsu
+models then read that plate correctly (0.99 / 0.97).
+
+**Three plate-detection bugs**, each found by looking at what the detector had actually locked
+onto rather than at the scores:
+- The component height cap assumed the plate is small in frame. A close-up plate has digits at
+  60% of image height, so at `0.5` *every digit was discarded* and the KOR badge became "the
+  plate". Raised to `0.85`.
+- Hairline strips down an image edge (2–6 px wide) counted as characters and pushed the column
+  count past its cap, disqualifying a good plate. Rejected below `cw < ch * 0.10`.
+- The band re-collection step used a looser height tolerance (`0.55`) than the rule that built
+  the chain (`0.65`), so it re-admitted the half-height KOR badge as a character and shifted
+  every slot one place left — the crop landed between the third digit and the hangul. Tolerances
+  now match.
+
+Scored set: **28/28**. All 34 images: 29/34. The five remaining failures are all plate
+*detection*: three lock onto background signage, one is a two-line plate whose region row is
+picked, and two are old-style plates the line finder does not detect. Note the harness does this
+localisation itself; in the app ML Kit does, so these do not predict app behaviour.
+
+Best configuration: `glyph_cnn_otsu_candidate.tflite` with valley snap, zero band margin,
+background trim, Otsu binarisation.
+
 ## Files (extra)
 - `train_realfont.py` — trains on real plate-font glyph images + real digits (reject class).
   Requires `KOR_PLATE_REPO` env var or a `kor_plate/` clone of kade93/kor_license_plate_generator.

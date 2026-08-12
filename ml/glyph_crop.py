@@ -58,6 +58,58 @@ def snap_to_glyph(gray, top, bot, cx, pitch):
     return L, R
 
 
+def trim_dark_background(g, keep=0.55):
+    """Drop rows of dark scene that sit outside the plate, above or below the glyph.
+
+    The text-line box is axis-aligned, so a tilted plate leaves wedges of background inside
+    the crop. Those wedges are much darker than the plate face, and a global threshold pools
+    them with the strokes — which is what turned the tilted 호 into 나. Trimming them first
+    also moves the crop closer to the training composition, whose background is plain white.
+    """
+    if g.size == 0 or g.shape[0] < 6:
+        return g
+    plate = float(np.percentile(g, 85))
+    if plate <= 1:
+        return g
+    med = np.median(g, axis=1)
+    keep_rows = med >= plate * keep
+    idx = np.flatnonzero(keep_rows)
+    if len(idx) < max(4, g.shape[0] * 0.35):
+        return g                      # not a clear plate/background split; leave it alone
+    return g[idx[0]:idx[-1] + 1, :]
+
+
+def binarize(g, mode):
+    """Optional preprocessing of the final crop, applied identically in training and eval.
+
+    Binarising discards dirt, shadow and worn-paint texture and keeps only stroke structure —
+    on a weathered plate that is the difference between reading 나 and reading 다. It only
+    pays off if the model is TRAINED on the same representation; feeding a binary crop to a
+    grey-trained model costs several points.
+    """
+    if mode in (None, "", "gray"):
+        return g
+    h, w = g.shape
+    blk = max(3, int(min(h, w) * 0.6) | 1)
+    if mode == "otsu":
+        return cv2.threshold(g, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    if mode == "flat_otsu":
+        # Otsu is a single global threshold, so it breaks down on a tilted, low-contrast
+        # embossed plate where the crop's own brightness ramps across it. Dividing out a
+        # heavily blurred copy flattens that ramp first, leaving Otsu a clean bimodal crop.
+        bg = cv2.GaussianBlur(g, (0, 0), max(2.0, min(h, w) * 0.5))
+        flat = cv2.divide(g, bg + 1, scale=192)
+        return cv2.threshold(flat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    if mode == "adapt_mean":
+        return cv2.adaptiveThreshold(g, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, blk, 7)
+    if mode == "adapt_gauss":
+        return cv2.adaptiveThreshold(g, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, blk, 7)
+    if mode == "adapt_soft":
+        bw = cv2.adaptiveThreshold(g, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, blk, 7)
+        return cv2.addWeighted(g, 0.35, bw, 0.65, 0)
+    raise ValueError(f"unknown binarize mode: {mode}")
+
+
 def snap_rows(gray, top, bot, l, r, frac=0.10):
     """Tighten a slot's vertical extent onto the glyph's own rows.
 

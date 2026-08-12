@@ -13,13 +13,14 @@ import os, glob, sys, numpy as np, cv2
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 from PIL import Image, ImageDraw, ImageFont
 import tensorflow as tf
-from glyph_crop import snap_to_glyph, crop_for_model
+from glyph_crop import snap_to_glyph, crop_for_model, binarize
 
 SC = os.path.dirname(os.path.abspath(__file__))
 REPO = os.environ.get("KOR_PLATE_REPO", os.path.join(SC, "kor_plate"))
 USAGE = list("가나다라마거너더러머버서어저고노도로모보소오조구누두루무부수우주아자바사하허호배")
 NCLS = len(USAGE); S = 48; H = 96
 HALF_W = float(os.environ.get("HALF_W", "0.62"))
+BINARIZE = os.environ.get("BINARIZE", "gray")
 
 FONT_DIR = r"C:\Windows\Fonts"
 FONT_FILES = ["malgunbd.ttf","malgun.ttf","gulim.ttc","batang.ttc","NGULIM.TTF",
@@ -121,6 +122,7 @@ def sample(ci, rng):
     got = crop_for_model(canvas, top, bot, cx, pitch, HALF_W)
     crop = got[0] if got else canvas[top:bot, max(0,int(gcx-pitch*0.6)):int(gcx+pitch*0.6)]
     if crop.size == 0: crop = canvas
+    crop = binarize(crop, BINARIZE)
     g = cv2.resize(crop,(S,S),interpolation=cv2.INTER_AREA).astype(np.float32)
     return (g-g.mean())/(g.std()+1e-6)
 
@@ -155,5 +157,5 @@ model.fit(Xtr,Ytr,validation_data=(Xva,Yva),epochs=40,batch_size=128,
           callbacks=[tf.keras.callbacks.EarlyStopping(patience=6,restore_best_weights=True,monitor="val_accuracy")],verbose=2)
 print(f"val acc: {model.evaluate(Xva,Yva,verbose=0)[1]*100:.2f}%")
 tfl=tf.lite.TFLiteConverter.from_keras_model(model).convert()
-out=os.path.join(SC,"glyph_cnn_snapcrop.tflite")
+out=os.path.join(SC, os.environ.get("OUT_NAME","glyph_cnn_snapcrop.tflite"))
 open(out,"wb").write(tfl); print("Saved",out,len(tfl),"bytes")

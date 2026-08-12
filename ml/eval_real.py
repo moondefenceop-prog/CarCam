@@ -15,7 +15,7 @@ import numpy as np, cv2
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from glyph_crop import snap_to_glyph, crop_for_model
+from glyph_crop import snap_to_glyph, crop_for_model, binarize, trim_dark_background
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 SC = os.path.dirname(os.path.abspath(__file__))
@@ -60,8 +60,18 @@ def find_line_box(gray):
     comps = []
     for i in range(1, nlab):
         x, y, cw, ch, area = stats[i]
-        if ch < 10 or ch > h * 0.5: continue
+        # The height cap only exists to drop scenery-sized blobs. It must not assume the
+        # plate is small in frame: a close-up fills it, and at 0.5 every digit of a
+        # frame-filling plate was thrown away, leaving the KOR badge to be "the plate".
+        if ch < 10 or ch > h * 0.85: continue
         if cw > ch * 1.6 or cw < 2: continue        # glyphs are tallish
+        # Hairline strips down an image edge are not glyphs; even a '1' is ~35% as wide as
+        # it is tall. Two such strips were padding the column count past its cap and
+        # disqualifying a perfectly good plate.
+        if cw < ch * 0.10: continue
+        # A glyph is strokes, not a filled block. This drops the solid KOR badge, which was
+        # being counted as a character and shifting every slot one place to the left.
+        if area > 0.85 * cw * ch: continue
         # Density floor only rejects hairline noise. An embossed (unpainted) plate
         # thresholds into thin broken outlines — 0.15 threw those glyphs away.
         if area < 0.05 * cw * ch: continue
@@ -109,7 +119,10 @@ def find_line_box(gray):
     L0 = min(c[0] for c in chain); R0 = max(c[0] + c[2] for c in chain)
     band = [c for c in comps
             if abs((c[1] + c[3] / 2) - cy) < mh * 0.5
-            and 0.55 * mh < c[3] < 1.5 * mh
+            # Match the chain's own height tolerance. At 0.55 this window was looser than the
+            # rule that built the chain, so it re-admitted the KOR badge (half the height of
+            # a digit) as a character and pushed every slot one place left.
+            and 0.65 * mh < c[3] < 1.35 * mh
             and L0 - mh * 1.5 < c[0] and c[0] + c[2] < R0 + mh * 1.5]
     if len(band) >= len(chain): chain = band
     xs0 = min(c[0] for c in chain); xs1 = max(c[0] + c[2] for c in chain)
@@ -157,7 +170,9 @@ for f in sorted(glob.glob(os.path.join(PLATES, "*.png"))):
             if got is None:
                 rows.append((name, mid, "?", 0.0, "nocrop")); continue
             sub, l, r = got
-            ch, cf = run_one(sub)
+            if os.environ.get("TRIM_BG", "1") == "1":
+                sub = trim_dark_background(sub)
+            ch, cf = run_one(binarize(sub, os.environ.get("BINARIZE", "gray")))
             best = (ch, cf, l, r); mode = "snap"
         else:
             best = ("?", 0.0, 0, 0); mode = "fit"
