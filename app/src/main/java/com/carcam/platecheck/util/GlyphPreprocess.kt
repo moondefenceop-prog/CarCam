@@ -78,6 +78,116 @@ object GlyphPreprocess {
     }
 
     /**
+     * Straighten a tilted text band.
+     *
+     * Everything downstream profiles columns across the full height of the band, so on a
+     * tilted plate each column mixes the top of one character with the bottom of the next.
+     * The valleys between characters fill in, the glyph cannot be separated, and the crop
+     * lands between characters — which is exactly what happened on a plate photographed at an
+     * angle.
+     *
+     * The skew is read off the text itself: the vertical centre of ink drifts linearly across
+     * a tilted line, so a least-squares fit of that drift gives the angle.
+     */
+    fun deskew(g: Gray, maxSlope: Float = 0.45f): Gray {
+        if (g.w < 12 || g.h < 8) return g
+        val mask = inkMask(g)
+        var n = 0
+        var sx = 0.0; var sy = 0.0; var sxx = 0.0; var sxy = 0.0
+        for (x in 0 until g.w) {
+            var sum = 0L; var count = 0
+            for (y in 0 until g.h) if (mask[y * g.w + x]) { sum += y; count++ }
+            if (count < 2) continue
+            val cy = sum.toDouble() / count
+            n++; sx += x; sy += cy; sxx += x.toDouble() * x; sxy += x * cy
+        }
+        if (n < 8) return g
+        val denom = n * sxx - sx * sx
+        if (Math.abs(denom) < 1e-6) return g
+        val slope = ((n * sxy - sx * sy) / denom).toFloat()
+        // Below this the shear costs more in resampling than it recovers; above it, the fit is
+        // being driven by something that is not a text line.
+        if (Math.abs(slope) < 0.03f || Math.abs(slope) > maxSlope) return g
+
+        // A horizontal shear is enough: it straightens the baseline without rotating strokes
+        // into each other, and needs only a per-column vertical shift.
+        val out = IntArray(g.w * g.h)
+        val midX = g.w / 2f
+        for (x in 0 until g.w) {
+            val shift = slope * (x - midX)
+            for (y in 0 until g.h) {
+                val srcY = y + shift
+                val y0 = Math.floor(srcY.toDouble()).toInt()
+                val f = (srcY - y0)
+                val a = if (y0 in 0 until g.h) g[x, y0] else 255
+                val b = if (y0 + 1 in 0 until g.h) g[x, y0 + 1] else 255
+                out[y * g.w + x] = (a * (1 - f) + b * f).toInt().coerceIn(0, 255)
+            }
+        }
+        return Gray(g.w, g.h, out)
+    }
+
+    /**
+     * Locate the usage glyph by counting in from the RIGHT, and return (centre, pitch).
+     *
+     * Dividing the box into equal slots assumes the box covers every character that was read.
+     * It often does not: on a measured frame ML Kit reported "10허7399" but its box began at
+     * the 0, covering six characters for a seven-character read. Slot 2 then landed in the gap
+     * between the glyph and the digits, and the classifier was asked to identify blank plate.
+     *
+     * The last four characters are always digits, never split into parts, and sit at an even
+     * pitch — so they make a dependable ruler. The glyph is whatever ink lies immediately left
+     * of them, agglomerated while it still fits one character width.
+     *
+     * Returns null when the columns do not look like a plate line, leaving the caller to fall
+     * back to the slot estimate.
+     */
+    fun hangulFromRight(g: Gray): FloatArray? {
+        if (g.w < 16 || g.h < 8) return null
+        val mask = inkMask(g)
+        val minInk = (g.h * 0.10f).toInt().coerceAtLeast(1)
+        val on = BooleanArray(g.w)
+        for (x in 0 until g.w) {
+            var c = 0
+            for (y in 0 until g.h) if (mask[y * g.w + x]) c++
+            on[x] = c >= minInk
+        }
+        val runs = ArrayList<IntArray>()
+        var i = 0
+        while (i < g.w) {
+            if (on[i]) {
+                var j = i
+                while (j + 1 < g.w && on[j + 1]) j++
+                if (j - i + 1 >= 2) runs.add(intArrayOf(i, j))
+                i = j + 1
+            } else i++
+        }
+        if (runs.size < 5) return null
+
+        val tail = runs.takeLast(4)
+        val centres = tail.map { (it[0] + it[1]) / 2f }
+        val gaps = centres.zipWithNext { a, b -> b - a }.sorted()
+        val pitch = gaps[gaps.size / 2]
+        if (pitch <= 2f) return null
+        // Digits of one plate line are evenly spaced; anything else is not the tail we want.
+        if (gaps.first() < pitch * 0.55f || gaps.last() > pitch * 1.8f) return null
+
+        val tailLeft = tail.first()[0]
+        var idx = runs.indexOfFirst { it[0] == tailLeft } - 1
+        if (idx < 0) return null
+        var left = runs[idx][0]
+        var right = runs[idx][1]
+        // A Hangul glyph is several disconnected parts; pull in neighbours while the result
+        // still fits inside one character.
+        while (idx - 1 >= 0 && (right - runs[idx - 1][0] + 1) <= pitch * 1.05f) {
+            idx--
+            left = runs[idx][0]
+        }
+        if (right - left < 2) return null
+        return floatArrayOf((left + right) / 2f, pitch)
+    }
+
+    /**
      * Shrink a text box onto the glyph rows and columns actually inside it.
      *
      * ML Kit's box is looser than the text: on a measured frame it was 131x38 where the ink
