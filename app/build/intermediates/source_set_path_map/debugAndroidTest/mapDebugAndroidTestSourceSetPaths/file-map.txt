@@ -1,5 +1,0 @@
-com.carcam.platecheck.test.app-jetified-core-1.6.1-0 C:\Users\breye\.gradle\caches\8.9\transforms\e7227ceae9424058e594158293808997\transformed\jetified-core-1.6.1\res
-com.carcam.platecheck.test.app-androidTest-1 D:\CarCam\app\build\generated\res\resValues\androidTest\debug
-com.carcam.platecheck.test.app-mergeDebugAndroidTestResources-2 D:\CarCam\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\merged.dir
-com.carcam.platecheck.test.app-mergeDebugAndroidTestResources-3 D:\CarCam\app\build\intermediates\incremental\debugAndroidTest\mergeDebugAndroidTestResources\stripped.dir
-com.carcam.platecheck.test.app-debugAndroidTest-4 D:\CarCam\app\build\intermediates\merged_res\debugAndroidTest\mergeDebugAndroidTestResources

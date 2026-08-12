@@ -1,3 +1,0 @@
-com.carcam.platecheck.test
-style WhiteBackgroundDialogTheme
-style WhiteBackgroundTheme

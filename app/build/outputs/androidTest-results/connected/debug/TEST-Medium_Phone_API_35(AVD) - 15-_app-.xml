@@ -1,9 +1,0 @@
-<?xml version='1.0' encoding='UTF-8' ?>
-<testsuite name="com.carcam.platecheck.PlateRecognitionBenchmarkTest" tests="1" failures="0" errors="0" skipped="0" time="3.42" timestamp="2026-07-12T06:07:24" hostname="localhost">
-  <properties>
-    <property name="device" value="Medium_Phone_API_35(AVD) - 15" />
-    <property name="flavor" value="" />
-    <property name="project" value=":app" />
-  </properties>
-  <testcase name="benchmarkAllConfigs" classname="com.carcam.platecheck.PlateRecognitionBenchmarkTest" time="2.971" />
-</testsuite>
