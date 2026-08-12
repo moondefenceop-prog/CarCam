@@ -566,8 +566,10 @@ class MainActivity : AppCompatActivity() {
 
     @androidx.camera.core.ExperimentalGetImage
     private fun retainFrameForVerification(imageProxy: ImageProxy, rotation: Int, read: String) {
-        val bmp = runCatching { ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation) }.getOrNull()
-            ?: return
+        // Exact conversion, not the JPEG path: a saved frame has to be what ML Kit was given,
+        // or it does not reproduce the misreading it was captured for.
+        val bmp = runCatching { ImageUtils.imageProxyToUprightBitmapExact(imageProxy, rotation) }
+            .getOrNull() ?: return
         // Deliberately not recycling the previous bitmap: the dialog may still be holding it,
         // and compressing a recycled bitmap failed *after* creating the file, which is what
         // left zero-byte captures behind. Dropping the reference is enough.

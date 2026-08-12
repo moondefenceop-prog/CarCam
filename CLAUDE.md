@@ -1,5 +1,7 @@
 # CarCam
 
+**Current state and what to pick up next: [STATUS.md](STATUS.md).**
+
 ## What this app is for
 
 **Finding vehicles parked without permission in a large residential space** — an apartment

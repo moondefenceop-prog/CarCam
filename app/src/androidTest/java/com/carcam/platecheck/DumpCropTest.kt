@@ -26,7 +26,6 @@ import java.io.FileOutputStream
  * Run with `am instrument` on an installed build; `connectedAndroidTest` uninstalls the app
  * afterwards and takes its external files directory with it.
  */
-@Ignore("Diagnostic only; run explicitly with am instrument on an installed build.")
 @RunWith(AndroidJUnit4::class)
 class DumpCropTest {
 

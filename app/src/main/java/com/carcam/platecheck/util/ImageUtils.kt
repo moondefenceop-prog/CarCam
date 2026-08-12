@@ -88,6 +88,49 @@ object ImageUtils {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
+    /**
+     * The same frame, converted without the JPEG round-trip.
+     *
+     * [imageProxyToUprightBitmap] compresses to JPEG and decodes back, which is fine for the
+     * recognition passes but wrong for saving a frame as evidence: JPEG's quantisation is a
+     * low-pass filter, and on a plate photographed off a monitor it visibly removes the moiré.
+     * Frames saved that way did not reproduce the misreading they were captured for — ML Kit
+     * read two of them correctly from the file after failing on them live.
+     *
+     * Slower than the JPEG path, so it is only used for capture, never per frame.
+     */
+    fun imageProxyToUprightBitmapExact(imageProxy: ImageProxy, rotationDegrees: Int): Bitmap? {
+        val mediaImage = imageProxy.image ?: return null
+        val w = mediaImage.width
+        val h = mediaImage.height
+        val nv21 = yuv420888ToNv21(mediaImage)
+        val argb = IntArray(w * h)
+        val frameSize = w * h
+        for (y in 0 until h) {
+            val uvRow = frameSize + (y shr 1) * w
+            for (x in 0 until w) {
+                val yy = (nv21[y * w + x].toInt() and 0xFF) - 16
+                val yv = if (yy < 0) 0 else yy
+                val uvIndex = uvRow + (x and 1.inv())
+                val v = (nv21[uvIndex].toInt() and 0xFF) - 128
+                val u = (nv21[uvIndex + 1].toInt() and 0xFF) - 128
+                // BT.601, the range CameraX delivers for YUV_420_888.
+                val y1192 = 1192 * yv
+                var r = (y1192 + 1634 * v) shr 10
+                var g = (y1192 - 833 * v - 400 * u) shr 10
+                var b = (y1192 + 2066 * u) shr 10
+                r = if (r < 0) 0 else if (r > 255) 255 else r
+                g = if (g < 0) 0 else if (g > 255) 255 else g
+                b = if (b < 0) 0 else if (b > 255) 255 else b
+                argb[y * w + x] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            }
+        }
+        val bitmap = Bitmap.createBitmap(argb, w, h, Bitmap.Config.ARGB_8888)
+        if (rotationDegrees == 0) return bitmap
+        val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
     private fun yuv420888ToNv21(image: Image): ByteArray {
         val width = image.width
         val height = image.height
