@@ -21,7 +21,8 @@ abstract class PlateDatabase : RoomDatabase() {
          * hundreds of rows imported from a spreadsheet — and dropping it on an app update
          * would be unrecoverable for them.
          */
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        @androidx.annotation.VisibleForTesting
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """CREATE TABLE IF NOT EXISTS `visits` (

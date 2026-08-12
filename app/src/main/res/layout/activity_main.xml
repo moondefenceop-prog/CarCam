@@ -124,6 +124,32 @@
             android:text="@string/mode_parking" />
     </com.google.android.material.chip.ChipGroup>
 
+    <!-- 검증 캡처: 켜면 인식된 프레임을 들고 있다가 정정 입력과 함께 저장한다. -->
+    <com.google.android.material.chip.Chip
+        android:id="@+id/chipCapture"
+        style="@style/Widget.MaterialComponents.Chip.Filter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:text="@string/verify_capture"
+        app:layout_constraintBottom_toBottomOf="@id/modeGroup"
+        app:layout_constraintTop_toTopOf="@id/modeGroup"
+        app:layout_constraintStart_toEndOf="@id/modeGroup" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnReportWrong"
+        style="@style/Widget.MaterialComponents.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="44dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/report_wrong"
+        android:textSize="13sp"
+        android:visibility="gone"
+        app:backgroundTint="@color/not_registered_red"
+        app:layout_constraintBottom_toTopOf="@id/modeGroup"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <!-- 입출차 모드 전용: 현재 주차 중 대수 + 기록 화면 진입 -->
     <TextView
         android:id="@+id/tvParkedCount"

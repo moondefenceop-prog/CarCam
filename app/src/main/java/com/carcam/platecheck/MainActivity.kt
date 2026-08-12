@@ -21,7 +21,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.carcam.platecheck.databinding.ActivityMainBinding
 import com.carcam.platecheck.databinding.DialogManualCheckBinding
+import com.carcam.platecheck.databinding.DialogReportWrongBinding
 import com.carcam.platecheck.ui.MainViewModel
+import com.carcam.platecheck.util.CaptureStore
 import com.carcam.platecheck.util.GlyphClassifier
 import com.carcam.platecheck.util.ImageUtils
 import com.carcam.platecheck.util.KoreanPlateRecognizer
@@ -43,6 +45,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private val recognizer = TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
     private val activeJobs = java.util.concurrent.atomic.AtomicInteger(0)
+
+    // 검증 캡처 상태. 마지막으로 번호판이 인식된 프레임과 그때의 판독 결과를 들고 있다가
+    // 사용자가 "인식 정정"을 누르면 정답 라벨과 함께 저장한다.
+    @Volatile private var captureMode = false
+    @Volatile private var lastFrame: android.graphics.Bitmap? = null
+    @Volatile private var lastFrameRead = ""
 
     // 적응형 프레임 쓰로틀: 카메라가 주는 모든 프레임(보통 30fps)을 다 인식하면 발열/배터리
     // 부담이 크다. 번호판(또는 후보)이 보이는 동안은 ACTIVE 간격으로 빠르게 돌고, 한동안
@@ -133,6 +141,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnManualCheck.setOnClickListener { showManualCheckDialog() }
+
+        // 검증 캡처: 켰을 때만 프레임을 들고 있는다. 항상 붙잡아두면 인식 프레임마다
+        // 비트맵 변환 비용이 들고 메모리도 계속 잡힌다.
+        binding.chipCapture.setOnCheckedChangeListener { _, checked ->
+            captureMode = checked
+            if (!checked) {
+                lastFrame = null
+                lastFrameRead = ""
+                binding.btnReportWrong.isVisible = false
+            }
+            Snackbar.make(
+                binding.root,
+                if (checked) getString(R.string.captured_files, CaptureStore.count(this)) else "검증 캡처 꺼짐",
+                Snackbar.LENGTH_SHORT
+            ).show()
+        }
+        binding.btnReportWrong.setOnClickListener { showReportWrongDialog() }
 
         applyMode(viewModel.mode)
         binding.modeGroup.check(
@@ -279,6 +304,12 @@ class MainActivity : AppCompatActivity() {
                                 } else box to candidate
                             }
                         }
+                    }
+                    // 검증 캡처가 켜져 있을 때만 프레임을 보관한다. 사용자가 눈으로 오인식을
+                    // 발견하는 순간은 이 경로(ML Kit이 무언가를 읽어낸 프레임)이므로, 여기서
+                    // 잡아두지 않으면 정정하려 할 때 이미 프레임이 사라지고 없다.
+                    if (captureMode && direct.isNotEmpty()) {
+                        retainFrameForVerification(imageProxy, rotation, direct.first().second)
                     }
                     imageProxy.close()
                     handleDetections(direct, visibleRegion)
@@ -471,6 +502,53 @@ class MainActivity : AppCompatActivity() {
                 tv.visibility = View.GONE
             }
         }
+    }
+
+    @androidx.camera.core.ExperimentalGetImage
+    private fun retainFrameForVerification(imageProxy: ImageProxy, rotation: Int, read: String) {
+        val bmp = runCatching { ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation) }.getOrNull()
+            ?: return
+        lastFrame?.recycle()
+        lastFrame = bmp
+        lastFrameRead = read
+        runOnUiThread { binding.btnReportWrong.isVisible = true }
+    }
+
+    /**
+     * Turn "that one is wrong" into a labelled regression case. The picture alone is not
+     * useful — the pipeline already saw it and was happy — so the correct plate is captured
+     * with it, and the file is named the way the offline evaluation set names its images so a
+     * pulled capture drops straight in.
+     */
+    private fun showReportWrongDialog() {
+        val frame = lastFrame ?: run {
+            Snackbar.make(binding.root, "저장할 프레임이 없습니다", Snackbar.LENGTH_SHORT).show()
+            return
+        }
+        val dialogBinding = DialogReportWrongBinding.inflate(LayoutInflater.from(this))
+        dialogBinding.tvAppRead.text = lastFrameRead.ifEmpty { "(없음)" }
+        dialogBinding.etCorrect.setText(lastFrameRead)
+        dialogBinding.tvCaptureCount.text = getString(R.string.captured_files, CaptureStore.count(this))
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.report_wrong)
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val correct = dialogBinding.etCorrect.text?.toString()?.trim().orEmpty()
+                if (correct.isEmpty()) {
+                    Snackbar.make(binding.root, "정확한 번호판을 입력하세요", Snackbar.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val saved = CaptureStore.save(this, frame, correct, lastFrameRead)
+                Snackbar.make(
+                    binding.root,
+                    if (saved != null) "저장됨 · ${getString(R.string.captured_files, saved.total)}"
+                    else "저장 실패",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun applyMode(mode: ParkingMode) {
