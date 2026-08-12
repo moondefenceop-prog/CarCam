@@ -17,6 +17,9 @@ interface PlateDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(plate: PlateEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(plates: List<PlateEntity>)
+
     @Delete
     suspend fun delete(plate: PlateEntity)
 }

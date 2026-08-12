@@ -1,0 +1,200 @@
+07-12 06:07:20.183 26746 26774 I TestRunner: started: benchmarkAllConfigs(com.carcam.platecheck.PlateRecognitionBenchmarkTest)
+07-12 06:07:20.222 26746 26774 D CompatChangeReporter: Compat change id reported: 247079863; UID 10229; state: ENABLED
+07-12 06:07:20.224 26746 26774 I PlateBenchmark: Loaded 27 labeled test cases
+07-12 06:07:20.265 26746 26776 D TransportRuntime.JobInfoScheduler: Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+07-12 06:07:20.293 26746 26780 I DynamiteModule: Considering local module com.google.mlkit.dynamite.text.korean:10000 and remote module com.google.mlkit.dynamite.text.korean:0
+07-12 06:07:20.293 26746 26780 I DynamiteModule: Selected local version of com.google.mlkit.dynamite.text.korean
+07-12 06:07:20.319  1078  1078 D BoundBrokerSvc: onRebind: Intent { act=com.google.android.gms.common.telemetry.service.START dat=chimera-action:/... cmp=com.google.android.gms/.chimera.PersistentApiService }
+07-12 06:07:20.337 26746 26781 D nativeloader: Load /data/app/~~VtgkbP3GUJCu_mdbDha3qQ==/com.carcam.platecheck-1Iq4oNrelxB__-Hq9qg2yg==/base.apk!/lib/x86_64/libmlkit_google_ocr_pipeline.so using ns clns-7 from class loader (caller=/data/app/~~VtgkbP3GUJCu_mdbDha3qQ==/com.carcam.platecheck-1Iq4oNrelxB__-Hq9qg2yg==/base.apk!classes8.dex): ok
+07-12 06:07:20.344 26746 26781 I native  : I0000 00:00:1783836440.344024   26781 asset_manager_util.cc:59] Created global reference to asset manager.
+07-12 06:07:20.372 26746 26776 D TransportRuntime.SQLiteEventStore: Storing event with priority=DEFAULT, name=FIREBASE_ML_SDK for destination cct
+07-12 06:07:20.379 26746 26776 D TransportRuntime.JobInfoScheduler: Scheduling upload for context TransportContext(cct, DEFAULT, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) with jobId=1853629820 in 848051ms(Backend next call timestamp 1783837288430). Attempt 1
+07-12 06:07:20.379 26746 26776 D CompatChangeReporter: Compat change id reported: 253665015; UID 10229; state: ENABLED
+07-12 06:07:20.389 26746 26776 D TransportRuntime.SQLiteEventStore: Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+07-12 06:07:20.395 26746 26776 D TransportRuntime.JobInfoScheduler: Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+07-12 06:07:20.405 26746 26776 D TransportRuntime.SQLiteEventStore: Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+07-12 06:07:20.413 26746 26781 I Manager : DeviceManager::DeviceManager
+07-12 06:07:20.413 26746 26781 W ServerFlag: Failed to parse result of GetServerConfigurableFlag, errno=34
+07-12 06:07:20.413 26746 26781 I Manager : findAvailableDevices
+07-12 06:07:20.415 26746 26776 D TransportRuntime.JobInfoScheduler: Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+07-12 06:07:20.419 26746 26781 W rcam.platecheck: AIBinder_linkToDeath is being called with a non-null cookie and no onUnlink callback set. This might not be intended. AIBinder_DeathRecipient_setOnUnlinked should be called first.
+07-12 06:07:20.421 26746 26781 W rcam.platecheck: AIBinder_linkToDeath is being called with a non-null cookie and no onUnlink callback set. This might not be intended. AIBinder_DeathRecipient_setOnUnlinked should be called first.
+07-12 06:07:20.422 26746 26781 I Manager : Found interface nnapi-sample_all (version = JUST_AN_EXAMPLE)
+07-12 06:07:20.422 26746 26781 I Manager : Found interface nnapi-sample_quant (version = JUST_AN_EXAMPLE)
+07-12 06:07:20.422 26746 26781 I Manager : Found interface nnapi-sample_sl_shim (version = JUST_AN_EXAMPLE)
+07-12 06:07:20.438 26746 26784 I native  : I0000 00:00:1783836440.438293   26784 text_classifier.cc:32] Creating classifier TfliteTextClassifier
+07-12 06:07:20.438 26746 26783 I native  : I0000 00:00:1783836440.438310   26783 text_detector_thread_pool_context.cc:38] Compute manager max in flight region detector overwrite: 1
+07-12 06:07:20.438 26746 26784 I native  : I0000 00:00:1783836440.438637   26784 common_util.h:38] Resizing Thread Pool: ocr_segm to 3
+07-12 06:07:20.438 26746 26783 I native  : I0000 00:00:1783836440.438853   26783 common_util.h:38] Resizing Thread Pool: ocr_det_0 to 3
+07-12 06:07:20.439 26746 26783 I tflite  : Initialized TensorFlow Lite runtime.
+07-12 06:07:20.439 26746 26784 I native  : I0000 00:00:1783836440.439969   26784 tflite_lstm_client_base.cc:372] Resizing interpreter pool to 4
+07-12 06:07:20.442 26746 26784 I native  : I0000 00:00:1783836440.441978   26784 multi_pass_line_recognition_mutator.cc:312] Preloading recognizers.
+07-12 06:07:20.442 26746 26784 I native  : I0000 00:00:1783836440.442560   26784 multi_pass_line_recognition_mutator.cc:319] Preloading a recognizer for "Kore"
+07-12 06:07:20.442 26746 26783 I tflite  : Created TensorFlow Lite XNNPACK delegate for CPU.
+07-12 06:07:20.442 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.442 26746 26794 I native  : I0000 00:00:1783836440.442826   26794 tflite_model_pooled_runner.cc:535] Loading mlkit-google-ocr-models/gocr/gocr_models/line_recognition_legacy_mobile/Kore_ctc/optical/conv_model.fb
+07-12 06:07:20.443 26746 26794 I native  : I0000 00:00:1783836440.443214   26794 tflite_model_pooled_runner.cc:541] Loading mlkit-google-ocr-models/gocr/gocr_models/line_recognition_legacy_mobile/Kore_ctc/optical/lstm_model.fb
+07-12 06:07:20.443 26746 26783 I native  : I0000 00:00:1783836440.443397   26783 tflite_detector_client_with_shape_cache.cc:102] Caching size: 10
+07-12 06:07:20.445 26746 26783 I native  : I0000 00:00:1783836440.445662   26783 tflite_model_pooled_runner.cc:535] Loading mlkit-google-ocr-models/gocr/layout/line_splitting_custom_ops/model.tflite
+07-12 06:07:20.445 26746 26783 I native  : I0000 00:00:1783836440.445979   26783 tflite_model_pooled_runner.cc:649] Resizing interpreter pool to 1
+07-12 06:07:20.446 26746 26783 I native  : I0000 00:00:1783836440.446587   26783 tflite_model_pooled_runner.cc:535] Loading mlkit-google-ocr-models/gocr/layout/line_clustering_custom_ops/model.tflite
+07-12 06:07:20.446 26746 26783 I native  : I0000 00:00:1783836440.446804   26783 tflite_model_pooled_runner.cc:649] Resizing interpreter pool to 1
+07-12 06:07:20.447 26746 26784 I native  : I0000 00:00:1783836440.447721   26784 multi_pass_line_recognition_mutator.cc:319] Preloading a recognizer for "Latn"
+07-12 06:07:20.447 26746 26794 I native  : I0000 00:00:1783836440.447846   26794 tflite_model_pooled_runner.cc:649] Resizing interpreter pool to 4
+07-12 06:07:20.448 26746 26795 I native  : I0000 00:00:1783836440.448011   26795 tflite_model_pooled_runner.cc:535] Loading mlkit-google-ocr-models/gocr/gocr_models/line_recognition_legacy_mobile/Latn_ctc/optical/conv_model.fb
+07-12 06:07:20.449 26746 26795 I native  : I0000 00:00:1783836440.449451   26795 tflite_model_pooled_runner.cc:541] Loading mlkit-google-ocr-models/gocr/gocr_models/line_recognition_legacy_mobile/Latn_ctc/optical/lstm_model.fb
+07-12 06:07:20.451 26746 26794 I native  : I0000 00:00:1783836440.451178   26794 mobile_langid_v2.cc:58] MobileLangID V2 initialized.
+07-12 06:07:20.451 26746 26794 I native  : I0000 00:00:1783836440.451268   26794 multi_pass_line_recognition_mutator.cc:332] Finished preloading a recognizer for "Kore"
+07-12 06:07:20.451 26746 26795 I native  : I0000 00:00:1783836440.451260   26795 tflite_model_pooled_runner.cc:649] Resizing interpreter pool to 4
+07-12 06:07:20.452 26746 26795 I native  : I0000 00:00:1783836440.452407   26795 mobile_langid_v2.cc:58] MobileLangID V2 initialized.
+07-12 06:07:20.452 26746 26795 I native  : I0000 00:00:1783836440.452800   26795 multi_pass_line_recognition_mutator.cc:332] Finished preloading a recognizer for "Latn"
+07-12 06:07:20.453 26746 26784 I native  : I0000 00:00:1783836440.453075   26784 multi_pass_line_recognition_mutator.cc:336] Finished preloading recognizers.
+07-12 06:07:20.457 26746 26781 I native  : I0000 00:00:1783836440.457807   26781 scheduler.cc:662] ImageMetadata: 100x60
+07-12 06:07:20.469 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.499 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.508 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.519 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.538 26746 26776 D TransportRuntime.SQLiteEventStore: Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+07-12 06:07:20.542 26746 26776 D TransportRuntime.JobInfoScheduler: Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+07-12 06:07:20.550 26746 26776 D TransportRuntime.SQLiteEventStore: Storing event with priority=VERY_LOW, name=FIREBASE_ML_SDK for destination cct
+07-12 06:07:20.553 26746 26776 D TransportRuntime.JobInfoScheduler: Upload for context TransportContext(cct, VERY_LOW, MSRodHRwczovL2ZpcmViYXNlbG9nZ2luZy5nb29nbGVhcGlzLmNvbS92MGNjL2xvZy9iYXRjaD9mb3JtYXQ9anNvbl9wcm90bzNc) is already scheduled. Returning...
+07-12 06:07:20.564 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.569 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.572 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.575 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.684 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.687 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.696 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.708 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.745 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.748 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.756 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.781 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.811 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.819 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.824 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.836 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.843 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.933 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.936 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:20.943 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:21.154 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:21.158 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:21.162 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:21.610 26746 26774 I PlateBenchmark: TEMPLATE raw=1547070 match=Match(character=러, score=0.633515, margin=0.074504614) box=Rect(267, 272 - 767, 372)
+07-12 06:07:21.661 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:21.677 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:21.687 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:21.762 26746 26774 I PlateBenchmark: TEMPLATE raw=15427070 match=Match(character=라, score=0.5500376, margin=0.024495542) box=Rect(319, 375 - 696, 452)
+07-12 06:07:21.869 26746 26774 I PlateBenchmark: TEMPLATE raw=1547070 match=Match(character=루, score=0.50757027, margin=0.052508444) box=Rect(299, 377 - 694, 456)
+07-12 06:07:21.970 26746 26774 I PlateBenchmark: TEMPLATE raw=15447070 match=Match(character=루, score=0.50107837, margin=0.0658901) box=Rect(301, 379 - 696, 457)
+07-12 06:07:22.089 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.104 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.110 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.114 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.133 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.137 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.141 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.146 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.169 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.173 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.177 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.183 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.291 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.295 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.302 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.383 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.387 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.390 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.394 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.421 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.426 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.430 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.439 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.454 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.458 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.466 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.471 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.504 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.513 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.517 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.528 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.625 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.635 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.638 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.647 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.677 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.682 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.693 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.698 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.718 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.723 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.726 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.737 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.759 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.762 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.768 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.778 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.781 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.826 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.830 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.834 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.892 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.896 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.900 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.906 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.952 26746 26774 I PlateBenchmark: TEMPLATE raw=63DIe6576 match=Match(character=로, score=0.6788875, margin=0.02970004) box=Rect(176, 440 - 251, 483)
+07-12 06:07:22.957 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.963 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.969 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.981 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:22.985 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.022 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.026 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.029 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.034 26746 26783 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.054 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.061 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.065 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.071 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.092 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.097 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.102 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.118 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.121 26746 26784 I tflite  : Replacing 44 out of 46 node(s) with delegate (TfLiteXNNPackDelegate) node, yielding 3 partitions for the whole graph.
+07-12 06:07:23.148 26746 26774 I PlateBenchmark: [two_pass_960_color] exact=63.0% (17/27)  digitMatch(=DB lookup)=88.9% (24/27)  avg=88ms  p50=65ms  p95=183ms
+07-12 06:07:23.148 26746 26774 I PlateBenchmark:   [two_pass_960_color] MISS file=10버7399.png expected=10버7399 actual=(none) rawText=[pass1:30|-10 7399-]
+07-12 06:07:23.149 26746 26774 I PlateBenchmark:   [two_pass_960_color] MISS file=177호1336.png expected=177호1336 actual=77호1336 rawText=[pass1:77호 1336]
+07-12 06:07:23.149 26746 26774 I PlateBenchmark:   [two_pass_960_color] MISS file=4피3151.png expected=4피3151 actual=(none) rawText=[pass1:서울 4|H3151]
+07-12 06:07:23.150 26746 26774 I PlateBenchmark: ===== SUMMARY =====
+07-12 06:07:23.150 26746 26774 I PlateBenchmark: [two_pass_960_color] exact=63.0% (17/27)  digitMatch(=DB lookup)=88.9% (24/27)  avg=88ms  p50=65ms  p95=183ms
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: ===== CSV =====
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: config,file,expected,actual,exact_match,digit_match,latency_ms
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,10버7399.png,10버7399,,false,false,183
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,120서6041.png,120서6041,120서6041,true,true,65
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,123가4567.png,123가4567,123가4567,true,true,70
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,12가3456_1.png,12가3456,12가3456,true,true,38
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,12가3456_2.png,12가3456,12가3456,true,true,66
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,12가3456_3.png,12가3456,12가3456,true,true,50
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,12나3456.png,12나3456,12나3456,true,true,49
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,12다3456.png,12다3456,12다3456,true,true,35
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,154러7070.png,154러7070,154러7070,true,true,466
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,154러7070_1.png,154러7070,15427070,false,true,124
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,154러7070_2.png,154러7070,1547070,false,true,88
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,154러7070_3.png,154러7070,15447070,false,true,83
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,154러7070_4.png,154러7070,154리7070,false,true,80
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,177호1336.png,177호1336,77호1336,false,false,45
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,178호6203.png,178호6203,178호6203,true,true,29
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,214머4167.png,214머4167,214허4167,false,true,55
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,242조5916.png,242조5916,242조5916,true,true,40
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,24가1234.png,24가1234,24가1234,true,true,92
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,30고5445.png,30고5445,30고5445,true,true,103
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,325바8419.png,325바8419,325바8419,true,true,59
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,392바7890.png,392바7890,392허7890,false,true,41
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,4피3151.png,4피3151,,false,false,134
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,52가3108.png,52가3108,52가3108,true,true,47
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,56너9876.png,56너9876,56너9876,true,true,67
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,63다6576.png,63다6576,63DIe6576,false,true,63
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,80아7890.png,80아7890,80아7890,true,true,134
+07-12 06:07:23.151 26746 26774 I PlateBenchmark: two_pass_960_color,임시1234.png,임시1234,임시1234,true,true,59
+07-12 06:07:23.152 26746 26774 I TestRunner: finished: benchmarkAllConfigs(com.carcam.platecheck.PlateRecognitionBenchmarkTest)

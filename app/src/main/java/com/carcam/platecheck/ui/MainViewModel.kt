@@ -19,7 +19,40 @@ data class ScanResult(
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = PlateRepository(app)
     val scanResult = MutableLiveData<ScanResult?>()
+
+    // Typed lookups are kept off [scanResult] on purpose: that stream drives the camera
+    // overlay and is cleared on a timer, which would wipe a result the user is still reading.
+    val manualResult = MutableLiveData<ScanResult?>()
     private var lastCheckedPlate = ""
+
+    /** Look up a hand-typed plate. Same matching rules as a scan, so a plate registered with
+     *  a mistyped usage glyph still resolves by its digits. */
+    fun checkManual(plateNumber: String) {
+        val query = plateNumber.trim()
+        if (query.isEmpty()) return
+        viewModelScope.launch {
+            val entity = repository.checkPlate(query)
+            manualResult.postValue(
+                ScanResult(
+                    plateNumber = query,
+                    isRegistered = entity != null,
+                    note = entity?.note ?: "",
+                    canonicalPlate = entity?.plateNumber ?: query
+                )
+            )
+        }
+    }
+
+    fun clearManualResult() {
+        manualResult.value = null
+    }
+
+    fun registerPlate(plateNumber: String, note: String = "") = viewModelScope.launch {
+        repository.addPlate(plateNumber, note)
+        // Drop the cached miss so the camera overlay stops calling it unregistered.
+        lastCheckedPlate = ""
+        checkManual(plateNumber)
+    }
 
     fun checkPlate(plateNumber: String) {
         if (plateNumber == lastCheckedPlate) return

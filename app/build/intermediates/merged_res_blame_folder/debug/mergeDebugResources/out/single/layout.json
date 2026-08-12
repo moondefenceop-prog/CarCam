@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.carcam.platecheck.app-mergeDebugResources-48:/layout/dialog_manual_check.xml",
+        "source": "com.carcam.platecheck.app-main-51:/layout/dialog_manual_check.xml"
+    },
+    {
+        "merged": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-mergeDebugResources-48:\\layout\\activity_plate_list.xml",
+        "source": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-main-51:\\layout\\activity_plate_list.xml"
+    },
+    {
+        "merged": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-mergeDebugResources-48:\\layout\\item_plate.xml",
+        "source": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-main-51:\\layout\\item_plate.xml"
+    },
+    {
+        "merged": "com.carcam.platecheck.app-mergeDebugResources-48:/layout/activity_main.xml",
+        "source": "com.carcam.platecheck.app-main-51:/layout/activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-mergeDebugResources-48:\\layout\\activity_main.xml",
+        "source": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-main-51:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-mergeDebugResources-48:\\layout\\dialog_add_plate.xml",
+        "source": "C:\\Users\\breye\\.gradle\\daemon\\8.9\\com.carcam.platecheck.app-main-51:\\layout\\dialog_add_plate.xml"
+    }
+]

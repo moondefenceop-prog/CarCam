@@ -2,6 +2,7 @@ package com.carcam.platecheck
 
 import android.os.Bundle
 import android.view.LayoutInflater
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -45,7 +46,27 @@ class PlateListActivity : AppCompatActivity() {
         }
 
         binding.fabAdd.setOnClickListener { showAddDialog() }
+
+        binding.toolbar.inflateMenu(R.menu.menu_plate_list)
+        binding.toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.action_import) {
+                // Let the picker show everything: providers label .xlsx and .csv with a range
+                // of MIME types, and a filter tight enough to be correct hides real files.
+                importLauncher.launch(arrayOf("*/*"))
+                true
+            } else false
+        }
+
+        viewModel.importStatus.observe(this) { message ->
+            if (message == null) return@observe
+            Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
+            viewModel.clearImportStatus()
+        }
     }
+
+    private val importLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { viewModel.importFrom(it) } }
 
     private fun showAddDialog() {
         val dialogBinding = DialogAddPlateBinding.inflate(LayoutInflater.from(this))

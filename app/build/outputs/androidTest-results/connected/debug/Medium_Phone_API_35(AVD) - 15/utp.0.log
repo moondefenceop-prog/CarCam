@@ -1,0 +1,47 @@
+정보: Constructing runner from config.
+정보: Configuring Android Instrumentation driver: android_instrumentation_runtime {
+  instrumentation_info {
+    app_package: "com.carcam.platecheck"
+    test_package: "com.carcam.platecheck.test"
+    test_runner_class: "androidx.test.runner.AndroidJUnitRunner"
+  }
+  instrumentation_args {
+    args_map {
+      key: "additionalTestOutputDir"
+      value: "/sdcard/Android/media/com.carcam.platecheck/additional_test_output"
+    }
+    args_map {
+      key: "class"
+      value: "com.carcam.platecheck.PlateRecognitionBenchmarkTest#benchmarkAllConfigs"
+    }
+    args_map {
+      key: "config"
+      value: "two_pass_960_color"
+    }
+  }
+}
+am_instrument_timeout: 31536000
+
+정보: Configuring AndroidTestApkInstallerPlugin: apks_to_install {
+  apk_paths: "D:\\CarCam\\app\\build\\outputs\\apk\\debug\\app-debug.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+apks_to_install {
+  apk_paths: "D:\\CarCam\\app\\build\\outputs\\apk\\androidTest\\debug\\app-debug-androidTest.apk"
+  install_options {
+  }
+  uninstall_after_test: true
+}
+
+정보: No installables found in test fixture. Nothing to install.
+정보: Installing [D:\CarCam\app\build\outputs\apk\debug\app-debug.apk] on device emulator-5554.
+정보: Installing [D:\CarCam\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk] on device emulator-5554.
+정보: Start logcat streaming.
+정보: Running Android Instrumentation driver.
+정보: Copying files from device to host: /sdcard/Android/media/com.carcam.platecheck/additional_test_output to D:\CarCam\app\build\outputs\connected_android_test_additional_output\debugAndroidTest\connected\Medium_Phone_API_35(AVD) - 15
+정보: Stop logcat streaming.
+정보: Uninstalling com.carcam.platecheck for device emulator-5554.
+정보: Uninstalling com.carcam.platecheck.test for device emulator-5554.
+정보: Execute com.carcam.platecheck.PlateRecognitionBenchmarkTest.benchmarkAllConfigs: PASSED

@@ -8,22 +8,26 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
 import android.util.Size
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.carcam.platecheck.databinding.ActivityMainBinding
+import com.carcam.platecheck.databinding.DialogManualCheckBinding
 import com.carcam.platecheck.ui.MainViewModel
 import com.carcam.platecheck.util.GlyphClassifier
 import com.carcam.platecheck.util.ImageUtils
 import com.carcam.platecheck.util.KoreanPlateRecognizer
 import com.carcam.platecheck.util.PlateOcrEngine
 import com.carcam.platecheck.util.PlateGlyphTemplateMatcher
+import com.google.android.material.snackbar.Snackbar
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
@@ -125,6 +129,8 @@ class MainActivity : AppCompatActivity() {
         binding.btnPlateList.setOnClickListener {
             startActivity(Intent(this, PlateListActivity::class.java))
         }
+
+        binding.btnManualCheck.setOnClickListener { showManualCheckDialog() }
 
         // 화면 중앙에는 아무것도 띄우지 않는다 — 번호판 텍스트와 등록 여부는 오버레이 박스
         // (흰색=등록, 빨간색=미등록)만으로 표시한다. 여기서는 등록 여부 캐시만 갱신한다.
@@ -437,6 +443,69 @@ class MainActivity : AppCompatActivity() {
                 tv.visibility = View.GONE
             }
         }
+    }
+
+    /**
+     * Escape hatch for when recognition simply will not read a plate — a dirty or damaged
+     * plate, an old two-line one, a motorcycle. The attendant types the number and gets the
+     * same registered/not-registered answer the camera would have given, including the
+     * digits-only fallback match, so a plate stored with a mistyped usage glyph still
+     * resolves. If it is genuinely unknown, it can be registered without leaving the dialog.
+     */
+    private fun showManualCheckDialog() {
+        val dialogBinding = DialogManualCheckBinding.inflate(LayoutInflater.from(this))
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.manual_check)
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.check, null)   // set below so it does not auto-dismiss
+            .setNegativeButton(R.string.close, null)
+            .setNeutralButton(R.string.register_this, null)
+            .create()
+
+        val observer = androidx.lifecycle.Observer<com.carcam.platecheck.ui.ScanResult?> { result ->
+            if (result == null) {
+                dialogBinding.resultBox.isVisible = false
+                return@Observer
+            }
+            dialogBinding.resultBox.isVisible = true
+            dialogBinding.resultBox.setBackgroundColor(
+                ContextCompat.getColor(
+                    this,
+                    if (result.isRegistered) R.color.registered_green else R.color.not_registered_red
+                )
+            )
+            dialogBinding.tvResultPlate.text = result.canonicalPlate
+            dialogBinding.tvResultStatus.setText(
+                if (result.isRegistered) R.string.registered else R.string.not_registered
+            )
+            dialogBinding.tvResultNote.isVisible = result.note.isNotEmpty()
+            dialogBinding.tvResultNote.text = result.note
+            // Registering only makes sense for a plate that is not already on the list.
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isVisible = !result.isRegistered
+        }
+        viewModel.manualResult.observe(this, observer)
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.isVisible = false
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                viewModel.checkManual(dialogBinding.etPlate.text?.toString().orEmpty())
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                val typed = dialogBinding.etPlate.text?.toString()?.trim().orEmpty()
+                if (typed.isEmpty()) return@setOnClickListener
+                viewModel.registerPlate(typed)
+                Snackbar.make(binding.root, "$typed 등록됨", Snackbar.LENGTH_SHORT).show()
+            }
+        }
+        dialogBinding.etPlate.setOnEditorActionListener { _, _, _ ->
+            viewModel.checkManual(dialogBinding.etPlate.text?.toString().orEmpty())
+            true
+        }
+        dialog.setOnDismissListener {
+            viewModel.manualResult.removeObserver(observer)
+            viewModel.clearManualResult()
+        }
+        dialog.show()
     }
 
     override fun onDestroy() {

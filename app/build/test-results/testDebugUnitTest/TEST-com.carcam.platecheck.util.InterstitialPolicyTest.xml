@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.carcam.platecheck.util.InterstitialPolicyTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-08-12T04:55:19" hostname="I7U1" time="0.004">
+  <properties/>
+  <testcase name="no ads while the install is new" classname="com.carcam.platecheck.util.InterstitialPolicyTest" time="0.003"/>
+  <testcase name="cap resets the next day" classname="com.carcam.platecheck.util.InterstitialPolicyTest" time="0.001"/>
+  <testcase name="shows after the grace period" classname="com.carcam.platecheck.util.InterstitialPolicyTest" time="0.0"/>
+  <testcase name="never twice inside the minimum gap" classname="com.carcam.platecheck.util.InterstitialPolicyTest" time="0.0"/>
+  <testcase name="daily cap holds across a busy shift" classname="com.carcam.platecheck.util.InterstitialPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

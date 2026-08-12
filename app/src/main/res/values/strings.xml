@@ -13,4 +13,10 @@
     <string name="delete">삭제</string>
     <string name="empty_list">등록된 차량이 없습니다</string>
     <string name="note_hint">메모 (선택사항)"</string>
+    <string name="manual_check">직접 입력 조회</string>
+    <string name="manual_check_hint">번호판이 인식되지 않을 때 직접 입력해 등록 차량인지 확인합니다.</string>
+    <string name="check">조회</string>
+    <string name="close">닫기</string>
+    <string name="register_this">이 번호로 등록</string>
+    <string name="import_excel">엑셀/CSV 가져오기</string>
 </resources>

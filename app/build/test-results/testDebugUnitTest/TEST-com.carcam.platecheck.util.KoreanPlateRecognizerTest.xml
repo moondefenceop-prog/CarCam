@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.carcam.platecheck.util.KoreanPlateRecognizerTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-08-12T04:55:19" hostname="I7U1" time="0.035">
+  <properties/>
+  <testcase name="extra final consonant is removed from reo" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.024"/>
+  <testcase name="digit runs adjacent to more digits are not plate candidates" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.001"/>
+  <testcase name="lenient repairs multi-char substitution to the real character" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.003"/>
+  <testcase name="middle Hangul misread as a digit leaves an 8-digit run repaired via key reinterpretation" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.002"/>
+  <testcase name="jamo plus vertical stroke restores reo" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.002"/>
+  <testcase name="jamo-plus-stroke fix does not fire without the digit run needing it" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="similar vowel OCR error is restored only with same initial" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="strict match on old-style plate" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="no match when digits are insufficient" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="compatibility jamo are composed into reo" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="misread vowel and final consonant are repaired by preserved initial" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.001"/>
+  <testcase name="consonant plus ㅣ is repaired to the ㅓ-column usage char" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="lenient repairs jamo-plus-stroke vowel misread to the real syllable" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="digitsOnly strips everything but digits" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.001"/>
+  <testcase name="compatibility jamo are composed into ra" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="lenient falls back to single-char substitution" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="ambiguous Latin letter is not guessed as a specific Hangul syllable" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="phone numbers with separators are not plate candidates" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="middle Hangul dropped entirely leaves a bare 7-digit run that is still a candidate" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="strict match on clean new-style plate" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.001"/>
+  <testcase name="candidateDigitKeys adds no reinterpretations when scan contains Hangul" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <testcase name="NFD Hangul is normalized before matching" classname="com.carcam.platecheck.util.KoreanPlateRecognizerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
