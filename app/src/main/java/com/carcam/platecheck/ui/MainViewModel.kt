@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.carcam.platecheck.data.PlateRepository
+import com.carcam.platecheck.data.VisitRepository
+import com.carcam.platecheck.util.ParkingMode
 import kotlinx.coroutines.launch
 
 data class ScanResult(
@@ -18,7 +20,41 @@ data class ScanResult(
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = PlateRepository(app)
+    private val visits = VisitRepository(app)
     val scanResult = MutableLiveData<ScanResult?>()
+
+    val parkedCount = visits.parkedCount
+
+    /** Set when a sighting produced an entry or exit, for the screen to announce and offer undo. */
+    val visitEvent = MutableLiveData<VisitRepository.Record?>()
+
+    var mode: ParkingMode = ParkingMode.load(app)
+        private set
+
+    fun setMode(newMode: ParkingMode) {
+        mode = newMode
+        ParkingMode.save(getApplication(), newMode)
+    }
+
+    /** Called for every confirmed sighting while in parking mode. Silently ignored inside the
+     *  per-plate cooldown, so a car queuing at the barrier does not toggle back and forth. */
+    fun recordSighting(plateNumber: String) {
+        viewModelScope.launch {
+            visits.onPlateSeen(plateNumber)?.let { visitEvent.postValue(it) }
+        }
+    }
+
+    fun undoVisit(record: VisitRepository.Record) = viewModelScope.launch {
+        visits.undo(record)
+        visitEvent.postValue(null)
+    }
+
+    fun convertToExit(record: VisitRepository.Record) = viewModelScope.launch {
+        visits.convertEntryToExit(record)
+        visitEvent.postValue(null)
+    }
+
+    fun clearVisitEvent() { visitEvent.value = null }
 
     // Typed lookups are kept off [scanResult] on purpose: that stream drives the camera
     // overlay and is cleared on a timer, which would wipe a result the user is still reading.

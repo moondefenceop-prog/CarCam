@@ -19,5 +19,17 @@
             </intent-filter>
         </activity>
         <activity android:name=".PlateListActivity" android:exported="false" />
+        <activity android:name=".VisitListActivity" android:exported="false" />
+
+        <!-- CSV 내보내기 공유용. 저장소 권한 없이 파일을 넘기기 위해 필요하다. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

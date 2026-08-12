@@ -25,7 +25,9 @@ import com.carcam.platecheck.ui.MainViewModel
 import com.carcam.platecheck.util.GlyphClassifier
 import com.carcam.platecheck.util.ImageUtils
 import com.carcam.platecheck.util.KoreanPlateRecognizer
+import com.carcam.platecheck.util.ParkingMode
 import com.carcam.platecheck.util.PlateOcrEngine
+import com.carcam.platecheck.util.formatDuration
 import com.carcam.platecheck.util.PlateGlyphTemplateMatcher
 import com.google.android.material.snackbar.Snackbar
 import com.google.mlkit.vision.common.InputImage
@@ -131,6 +133,29 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnManualCheck.setOnClickListener { showManualCheckDialog() }
+
+        applyMode(viewModel.mode)
+        binding.modeGroup.check(
+            if (viewModel.mode == ParkingMode.PARKING) R.id.chipParking else R.id.chipCheck
+        )
+        binding.modeGroup.setOnCheckedStateChangeListener { _, checked ->
+            val mode = if (checked.firstOrNull() == R.id.chipParking) {
+                ParkingMode.PARKING
+            } else ParkingMode.CHECK
+            viewModel.setMode(mode)
+            applyMode(mode)
+        }
+        binding.tvParkedCount.setOnClickListener {
+            startActivity(Intent(this, VisitListActivity::class.java))
+        }
+
+        viewModel.parkedCount.observe(this) { count ->
+            binding.tvParkedCount.text = getString(R.string.parked_count, count)
+        }
+
+        viewModel.visitEvent.observe(this) { record ->
+            if (record != null) showVisitRecorded(record)
+        }
 
         // 화면 중앙에는 아무것도 띄우지 않는다 — 번호판 텍스트와 등록 여부는 오버레이 박스
         // (흰색=등록, 빨간색=미등록)만으로 표시한다. 여기서는 등록 여부 캐시만 갱신한다.
@@ -381,6 +406,9 @@ class MainActivity : AppCompatActivity() {
             if (count >= CONFIRM_THRESHOLD) {
                 addToRecent(candidate)
                 viewModel.checkPlate(candidate)
+                // 입출차 모드에서만 기록. 같은 차가 프레임에 머무는 동안의 반복 인식은
+                // 저장소의 번호판별 쿨다운이 걸러낸다.
+                if (viewModel.mode == ParkingMode.PARKING) viewModel.recordSighting(candidate)
             }
         }
         // 이번 프레임에서 감지된 번호판 외 카운트 초기화 (연속성 깨짐)
@@ -443,6 +471,36 @@ class MainActivity : AppCompatActivity() {
                 tv.visibility = View.GONE
             }
         }
+    }
+
+    private fun applyMode(mode: ParkingMode) {
+        binding.tvParkedCount.isVisible = mode == ParkingMode.PARKING
+    }
+
+    /**
+     * Announce an entry or exit and leave a window to correct it. Correction matters more
+     * here than anywhere else in the app: recording is automatic, and the two mistakes it
+     * can make — a stray read, or reading an exit as an arrival because the car got in while
+     * the app was closed — are both invisible afterwards unless caught now.
+     */
+    private fun showVisitRecorded(record: com.carcam.platecheck.data.VisitRepository.Record) {
+        val isEntry = record.kind == com.carcam.platecheck.data.VisitRepository.Kind.ENTRY
+        val text = if (isEntry) {
+            "${record.visit.canonicalPlate} 입차"
+        } else {
+            val d = record.durationMs?.let { " · ${formatDuration(it)}" }.orEmpty()
+            "${record.visit.canonicalPlate} 출차$d"
+        }
+        val bar = Snackbar.make(binding.root, text, 10_000)
+        if (isEntry) {
+            // An exit scanned with no open stay looks exactly like an arrival; only the
+            // operator knows which it was.
+            bar.setAction(R.string.to_exit) { viewModel.convertToExit(record) }
+        } else {
+            bar.setAction(R.string.undo) { viewModel.undoVisit(record) }
+        }
+        bar.show()
+        viewModel.clearVisitEvent()
     }
 
     /**

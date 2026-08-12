@@ -19,4 +19,15 @@
     <string name="close">닫기</string>
     <string name="register_this">이 번호로 등록</string>
     <string name="import_excel">엑셀/CSV 가져오기</string>
+    <string name="mode_check">확인</string>
+    <string name="mode_parking">입출차</string>
+    <string name="visit_records">입출차 기록</string>
+    <string name="export_csv">CSV 내보내기</string>
+    <string name="undo">되돌리기</string>
+    <string name="to_exit">출차로 변경</string>
+    <string name="entry_unknown">입차 미확인</string>
+    <string name="still_parked">주차 중</string>
+    <string name="close_manually">수동 출차 처리</string>
+    <string name="empty_visits">이 날짜의 입출차 기록이 없습니다</string>
+    <string name="parked_count">주차 중 %d대</string>
 </resources>

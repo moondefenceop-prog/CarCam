@@ -1,5 +1,6 @@
 package com.carcam.platecheck
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,12 +50,20 @@ class PlateListActivity : AppCompatActivity() {
 
         binding.toolbar.inflateMenu(R.menu.menu_plate_list)
         binding.toolbar.setOnMenuItemClickListener { item ->
-            if (item.itemId == R.id.action_import) {
-                // Let the picker show everything: providers label .xlsx and .csv with a range
-                // of MIME types, and a filter tight enough to be correct hides real files.
-                importLauncher.launch(arrayOf("*/*"))
-                true
-            } else false
+            when (item.itemId) {
+                R.id.action_import -> {
+                    // Let the picker show everything: providers label .xlsx and .csv with a
+                    // range of MIME types, and a filter tight enough to be correct hides real
+                    // files.
+                    importLauncher.launch(arrayOf("*/*"))
+                    true
+                }
+                R.id.action_visits -> {
+                    startActivity(Intent(this, VisitListActivity::class.java))
+                    true
+                }
+                else -> false
+            }
         }
 
         viewModel.importStatus.observe(this) { message ->
