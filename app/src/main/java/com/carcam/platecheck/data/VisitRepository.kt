@@ -14,10 +14,13 @@ import android.content.Context
 class VisitRepository(
     context: Context,
     private val cooldownMs: Long = 90_000L,
-    private val now: () -> Long = System::currentTimeMillis
+    private val now: () -> Long = System::currentTimeMillis,
+    // Injectable so tests run against an in-memory database. A test that seeds and clears the
+    // real one deletes the user's registered vehicles and their entry/exit history.
+    db: PlateDatabase = PlateDatabase.getInstance(context)
 ) {
-    private val dao = PlateDatabase.getInstance(context).visitDao()
-    private val plates = PlateRepository(context)
+    private val dao = db.visitDao()
+    private val plates = PlateRepository(context, db)
 
     /** Last time each plate produced a record, to suppress repeat sightings of the same car. */
     private val lastAction = HashMap<String, Long>()

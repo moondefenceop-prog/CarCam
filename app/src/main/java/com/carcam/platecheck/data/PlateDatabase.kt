@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [PlateEntity::class, VisitEntity::class], version = 2, exportSchema = false)
+@Database(entities = [PlateEntity::class, VisitEntity::class], version = 3, exportSchema = false)
 abstract class PlateDatabase : RoomDatabase() {
     abstract fun plateDao(): PlateDao
     abstract fun visitDao(): VisitDao
@@ -41,13 +41,28 @@ abstract class PlateDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Indexes the plate list for scale. A resident list of a few thousand is normal, and
+         * every scanned frame queries it, so both lookup paths must be index hits. `digitsKey`
+         * is added empty here and backfilled from Kotlin — SQLite has no way to strip the
+         * non-digits out of a Hangul plate number.
+         */
+        @androidx.annotation.VisibleForTesting
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `plates` ADD COLUMN `digitsKey` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_plates_plateNumber` ON `plates` (`plateNumber`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_plates_digitsKey` ON `plates` (`digitsKey`)")
+            }
+        }
+
         fun getInstance(context: Context): PlateDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     PlateDatabase::class.java,
                     "plate_db"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }

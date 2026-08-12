@@ -1,6 +1,7 @@
 package com.carcam.platecheck
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
 import com.carcam.platecheck.data.PlateDatabase
 import com.carcam.platecheck.data.PlateRepository
@@ -9,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,14 +26,21 @@ class VisitRecordingTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private var clock = 1_700_000_000_000L
 
+    // In-memory, never the app's own database: clearing the real one would delete the
+    // user's registered vehicles and their entry/exit history off their phone.
+    private lateinit var db: PlateDatabase
+
     private fun repo(cooldownMs: Long = 90_000L) =
-        VisitRepository(context, cooldownMs) { clock }
+        VisitRepository(context, cooldownMs, { clock }, db)
 
     @Before
-    fun clearDb() = runBlocking {
-        val db = PlateDatabase.getInstance(context)
-        db.clearAllTables()
+    fun openDb() {
+        db = Room.inMemoryDatabaseBuilder(context, PlateDatabase::class.java)
+            .allowMainThreadQueries().build()
     }
+
+    @After
+    fun closeDb() { db.close() }
 
     @Test
     fun firstSightingIsAnEntryAndTheNextIsAnExit() = runBlocking {
@@ -127,7 +136,7 @@ class VisitRecordingTest {
 
     @Test
     fun aRegisteredCarIsMatchedThroughItsDigitsWhenTheGlyphIsMisread() = runBlocking {
-        PlateRepository(context).addPlate("154러7070", "테스트")
+        PlateRepository(context, db).addPlate("154러7070", "테스트")
         val r = repo()
         // OCR dropping the usage glyph leaves a bare digit run; it must still be the same car.
         val entry = r.onPlateSeen("1547070")!!
