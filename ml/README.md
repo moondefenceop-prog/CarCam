@@ -180,6 +180,35 @@ localisation itself; in the app ML Kit does, so these do not predict app behavio
 Best configuration: `glyph_cnn_otsu_candidate.tflite` with valley snap, zero band margin,
 background trim, Otsu binarisation.
 
+## Old-style green two-line plates (`old_plate.py`)
+The two plates the line finder could not see at all are the pre-2004 green ones. The repo
+already merged their two OCR lines (`PlateOcrEngine.stackedLinePairs`, `OLD_PATTERN`), but
+nothing downstream could produce a glyph crop from them. Three properties break the modern
+path, and only the first is obvious:
+
+1. **Inverted polarity** — white characters on green. The line finder tests for dark ink on a
+   bright field, the ink profiles assume it, and the CNN has only ever seen dark glyphs. The
+   green region is inverted once, up front, after which everything behaves normally.
+2. **Two lines**, so the glyph is not inside a single run of 7-8 characters.
+3. **Two layouts**, placing the glyph differently:
+   `대구30 / 고5445` (region + 2 digits, then GLYPH + 4 digits) → glyph is the bottom row's first;
+   `63다 / 6576` (2 digits + GLYPH, then 4 digits) → glyph is the top row's last.
+   They are separated by **counting characters per row**, never by reading them.
+
+Details that mattered: the plate is ~100x47 px in frame, so character gaps are 2-3 px and any
+merge tolerance wide enough to join a Hangul's parts also joins whole characters — the crop is
+upscaled to 240 px tall before segmenting. The glyph is framed from **its own box** rather than
+the slot pitch (the upper line's characters are much smaller, so a pitch-sized window leaves the
+glyph a speck), padding with background rather than growing the window, which otherwise drags in
+the plate border and the row below (that added a stroke under 다 and made it 두). The border is
+painted out of the image, not just out of the profiling mask, or its dark L turns 고 into 모.
+
+Result: both plates now localise correctly and one reads correctly (63다6576 → 다). `30고5445`
+reads 모: in the old typeface the ㄱ's descending stroke nearly meets the ㅗ's bar, closing into
+a ㅁ. All four model/binarisation combinations agree on 모 at 0.92-0.99, so this is the 1973-2004
+letterform, which no training asset covers — not a borderline call. Scored set is now 29/30
+(the two old plates joined the scored set, which was 28/28 over 28 images).
+
 ## Files (extra)
 - `train_realfont.py` — trains on real plate-font glyph images + real digits (reject class).
   Requires `KOR_PLATE_REPO` env var or a `kor_plate/` clone of kade93/kor_license_plate_generator.

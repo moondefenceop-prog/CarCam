@@ -16,6 +16,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from glyph_crop import snap_to_glyph, crop_for_model, binarize, trim_dark_background
+from old_plate import locate_old_glyph, crop_old_glyph
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 SC = os.path.dirname(os.path.abspath(__file__))
@@ -139,10 +140,24 @@ for f in sorted(glob.glob(os.path.join(PLATES, "*.png"))):
     p = parse_label(name)
     if not p: continue
     lead, mid, tail = p
-    img = cv2.imdecode(np.fromfile(f, np.uint8), cv2.IMREAD_GRAYSCALE)
+    # Decode grayscale for the modern path (cvtColor from BGR rounds differently and moves
+    # borderline cases); colour is only needed to spot a green old-style plate.
+    raw = np.fromfile(f, np.uint8)
+    img = cv2.imdecode(raw, cv2.IMREAD_GRAYSCALE)
     if img is None: continue
     box, cols = find_line_box(img)
     vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    if box is None:
+        # Old-style green plates are white-on-green and two-line; the modern path cannot see
+        # them at all, since it tests for dark ink on a bright field.
+        old = locate_old_glyph(cv2.imdecode(raw, cv2.IMREAD_COLOR))
+        if old is not None:
+            inv, (cl, cr), (t, b), pitch = old
+            sub = crop_old_glyph(inv, cl, cr, t, b)
+            if sub is not None and sub.size:
+                ch, cf = run_one(binarize(sub, os.environ.get("BINARIZE", "gray")))
+                rows.append((name, mid, ch, cf, "old"))
+                continue
     if box is None:
         rows.append((name, mid, "?", 0.0, "nobox"))
     else:
