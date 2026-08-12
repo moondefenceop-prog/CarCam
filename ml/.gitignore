@@ -5,3 +5,5 @@ kor_plate/
 chaindump/
 v2_preview.png
 glyph_cnn_slotcrop.tflite
+glyph_cnn_snapcrop.tflite
+snap_preview.png

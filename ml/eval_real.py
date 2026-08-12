@@ -1,11 +1,21 @@
 # -*- coding: utf-8 -*-
-"""Offline eval of glyph CNN on labeled real test plates.
+"""Offline eval of a glyph CNN on the labeled real test plates — no device needed.
+
 Locates the plate text line as a horizontal chain of similar-height dark components
-(approximating ML Kit's line box), then applies the app's slot geometry + sweep."""
+(approximating ML Kit's line box), then classifies the middle usage glyph.
+
+Slot location: when the chain yields exactly the expected number of character columns
+(leading digits + 1 hangul + 4 digits), the hangul is cropped from its ACTUAL column
+rather than from the width-division formula. Column-based location is what saves plates
+whose leading digit is faint (low-contrast embossed plates), where an equal-width split
+of a box that starts at the wrong character lands the crop on a digit.
+"""
 import os, glob, re, sys, io
 import numpy as np, cv2
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from glyph_crop import snap_to_glyph, crop_for_model
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 SC = os.path.dirname(os.path.abspath(__file__))
@@ -30,8 +40,19 @@ def run_one(gray):
     i = int(np.argmax(p))
     return LABELS[i], float(p[i])
 
+def merge_columns(chain):
+    """Collapse components that overlap horizontally into one character column.
+    Embossed/outlined glyphs fragment into several components (e.g. the ring of 6)."""
+    cols = []
+    for x, y, cw, ch in sorted(chain, key=lambda c: c[0]):
+        if cols and x < cols[-1][1] - min(cw, cols[-1][1] - cols[-1][0]) * 0.35:
+            cols[-1] = (cols[-1][0], max(cols[-1][1], x + cw))
+        else:
+            cols.append((x, x + cw))
+    return cols
+
 def find_line_box(gray):
-    """Find the longest horizontal chain of similar-height dark components (the digit line)."""
+    """Return (box, columns) for the best plate-line candidate, else (None, None)."""
     h, w = gray.shape
     bw = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
                                cv2.THRESH_BINARY_INV, 31, 15)
@@ -41,7 +62,9 @@ def find_line_box(gray):
         x, y, cw, ch, area = stats[i]
         if ch < 10 or ch > h * 0.5: continue
         if cw > ch * 1.6 or cw < 2: continue        # glyphs are tallish
-        if area < 0.15 * cw * ch: continue          # too sparse = noise
+        # Density floor only rejects hairline noise. An embossed (unpainted) plate
+        # thresholds into thin broken outlines — 0.15 threw those glyphs away.
+        if area < 0.05 * cw * ch: continue
         comps.append((x, y, cw, ch))
     best = None
     for a in comps:
@@ -54,13 +77,13 @@ def find_line_box(gray):
             if abs((by + bh / 2) - (ay + ah / 2)) > ah * 0.4: continue  # same row
             if abs(bx - ax) > ah * 9: continue                        # near horizontally
             chain.append(b)
-        if not (5 <= len(chain) <= 10): continue                      # plate line: 7-8 comps
+        cols = merge_columns(chain)
+        if not (5 <= len(cols) <= 9): continue                        # plate line: 7-8 chars
         xs0 = min(c[0] for c in chain); xs1 = max(c[0] + c[2] for c in chain)
         ys0 = min(c[1] for c in chain); ys1 = max(c[1] + c[3] for c in chain)
         span = xs1 - xs0
         if not (3.0 <= span / ah <= 9.0): continue                    # plate line aspect
-        # spacing uniformity of component centers
-        cxs = sorted(c[0] + c[2] / 2 for c in chain)
+        cxs = [(c[0] + c[1]) / 2 for c in cols]
         gaps = np.diff(cxs)
         if len(gaps) and gaps.mean() > 0 and gaps.std() / gaps.mean() > 0.75: continue
         # plate is dark-on-bright: bbox background must be bright vs glyph pixels
@@ -69,15 +92,29 @@ def find_line_box(gray):
         if roi.size == 0 or broi.mean() > 0.6: continue
         bgm = roi[~broi].mean() if (~broi).any() else 0
         fgm = roi[broi].mean() if broi.any() else 255
-        if bgm < 110 or bgm - fgm < 50: continue                      # not a bright plate
-        # plates are digit-dominated: components are tallish (median w/h well below 1)
+        if bgm < 110 or bgm - fgm < 40: continue                      # not a bright plate
         med_ar = float(np.median([c[2] / c[3] for c in chain]))
-        if med_ar > 0.8: continue
-        count_fit = 1.0 - min(abs(len(chain) - 7.5), 4) / 4.0
+        if med_ar > 0.8: continue                                     # digit-dominated
+        count_fit = 1.0 - min(abs(len(cols) - 7.5), 4) / 4.0
         score = ah * (1 + count_fit) * (1 + (bgm - fgm) / 255.0)
         if best is None or score > best[0]:
-            best = (score, (xs0, ys0, xs1, ys1))
-    return best[1] if best else None
+            best = (score, (xs0, ys0, xs1, ys1), chain)
+    if best is None: return (None, None)
+    # Re-collect every component sitting in the winning chain's row band. Seeded chaining
+    # is order-dependent and routinely drops a glyph (the 호 of 177호1336_3), which shifts
+    # the column indices and sends the hangul crop onto a digit.
+    chain = best[2]
+    mh = float(np.median([c[3] for c in chain]))
+    cy = float(np.median([c[1] + c[3] / 2 for c in chain]))
+    L0 = min(c[0] for c in chain); R0 = max(c[0] + c[2] for c in chain)
+    band = [c for c in comps
+            if abs((c[1] + c[3] / 2) - cy) < mh * 0.5
+            and 0.55 * mh < c[3] < 1.5 * mh
+            and L0 - mh * 1.5 < c[0] and c[0] + c[2] < R0 + mh * 1.5]
+    if len(band) >= len(chain): chain = band
+    xs0 = min(c[0] for c in chain); xs1 = max(c[0] + c[2] for c in chain)
+    ys0 = min(c[1] for c in chain); ys1 = max(c[1] + c[3] for c in chain)
+    return ((xs0, ys0, xs1, ys1), merge_columns(chain))
 
 def parse_label(name):
     m = re.match(r"(\d{2,3})([가-힣])(\d{4})", name)
@@ -91,7 +128,7 @@ for f in sorted(glob.glob(os.path.join(PLATES, "*.png"))):
     lead, mid, tail = p
     img = cv2.imdecode(np.fromfile(f, np.uint8), cv2.IMREAD_GRAYSCALE)
     if img is None: continue
-    box = find_line_box(img)
+    box, cols = find_line_box(img)
     vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     if box is None:
         rows.append((name, mid, "?", 0.0, "nobox"))
@@ -101,35 +138,53 @@ for f in sorted(glob.glob(os.path.join(PLATES, "*.png"))):
         pitch = (R - L) / total
         base_cx = L + (len(lead) + 0.5) * pitch
         top = max(0, int(T - (B - T) * 0.08)); bot = min(img.shape[0], int(B + (B - T) * 0.08))
-        best = ("?", 0.0, 0, 0)
-        for dx in CENTER_OFFSETS:
-            cx = base_cx + dx * pitch
-            for hw in HALF_WIDTHS:
-                half = pitch * hw
-                l = max(0, int(cx - half)); r = min(img.shape[1], int(cx + half))
-                if r - l < 8 or bot - top < 8: continue
-                ch, cf = run_one(img[top:bot, l:r])
-                if cf > best[1]: best = (ch, cf, l, r)
-        rows.append((name, mid, best[0], best[1], "ok"))
+        snap = snap_to_glyph(img, top, bot, base_cx, pitch)
+        if snap is not None:
+            # Snap fixes the CENTRE only. The crop keeps the trained slot framing (a bit
+            # wider than the glyph, so neighbouring strokes graze the edges) — feeding a
+            # tight glyph-hugging box instead collapses confidence, because the model has
+            # never seen that framing. Deliberately not a confidence-scored sweep: a crop
+            # that clips a glyph in half (나 → ㅏ) outscores the whole glyph, so picking the
+            # most confident window actively selects the broken one.
+            gcx = (snap[0] + snap[1]) / 2
+            got = crop_for_model(img, top, bot, gcx, pitch,
+                                 float(os.environ.get("HALF_W", "0.62")))
+            if got is None:
+                rows.append((name, mid, "?", 0.0, "nocrop")); continue
+            sub, l, r = got
+            ch, cf = run_one(sub)
+            best = (ch, cf, l, r); mode = "snap"
+        else:
+            best = ("?", 0.0, 0, 0); mode = "fit"
+            for dx in CENTER_OFFSETS:
+                cx = base_cx + dx * pitch
+                for hw in HALF_WIDTHS:
+                    half = pitch * hw
+                    l = max(0, int(cx - half)); r = min(img.shape[1], int(cx + half))
+                    if r - l < 4 or bot - top < 4: continue
+                    ch, cf = run_one(img[top:bot, l:r])
+                    if cf > best[1]: best = (ch, cf, l, r)
+        rows.append((name, mid, best[0], best[1], mode))
         cv2.rectangle(vis, (L, T), (R, B), (0, 0, 255), 2)
+        for cl, cr in cols:
+            cv2.rectangle(vis, (cl, T), (cr, B), (255, 160, 0), 1)
         cv2.rectangle(vis, (best[2], top), (best[3], bot), (0, 255, 0), 2)
     small = cv2.resize(vis, (480, int(480 * vis.shape[0] / vis.shape[1])))
     cv2.imencode(".png", small)[1].tofile(os.path.join(DUMP, name + ".png"))
 
-# Images where THIS harness's plate localization is known-bad (verified visually):
-# background-sign locks, a file-explorer screenshot, and a two-line plate whose slot
-# formula differs. Excluded from the classifier metric — their errors are not the CNN's.
+# Images the user reviewed and classified as genuinely unreadable by eye.
+UNREADABLE = {"154러7070_7"}
+# Images where THIS harness locks onto background signage instead of the plate
+# (the app uses ML Kit's box, so these are harness artifacts, not classifier errors).
 EXCLUDE = {"56너9876", "325바8419", "12가3456_2", "154러7070_6", "80아7890"}
 correct = 0; n = 0; vc = 0; vn = 0
 for name, gt, pr, cf, st in rows:
     ok = "O" if pr == gt else "x"
-    if st == "ok":
+    tag = " EXCL" if name in EXCLUDE else (" UNREADABLE" if name in UNREADABLE else "")
+    if st != "nobox":
         n += 1; correct += (pr == gt)
-        if name not in EXCLUDE: vn += 1; vc += (pr == gt)
-    print(f"{name:22s} {gt} -> {pr} {cf:.3f} {ok} {st if st!='ok' else ''}{' EXCL' if name in EXCLUDE else ''}")
+        if name not in EXCLUDE and name not in UNREADABLE:
+            vn += 1; vc += (pr == gt)
+    print(f"{name:22s} {gt} -> {pr} {cf:.3f} {ok} {st if st=='nobox' else '['+st+']'}{tag}")
 print(f"\nmiddle accuracy (all): {correct}/{n} (nobox {len(rows)-n})")
-print(f"middle accuracy (valid-localization): {vc}/{vn}")
-for tau in (0.5, 0.8, 0.9, 0.95, 0.99):
-    sel = [(gt, pr) for _, gt, pr, cf, st in rows if st == "ok" and cf >= tau]
-    hits = sum(1 for gt, pr in sel if gt == pr)
-    print(f"gate conf>={tau:.2f}: fires {len(sel):2d}/{n}, precision {hits}/{len(sel) if sel else 0}")
+print(f"middle accuracy (scored set): {vc}/{vn}")
