@@ -30,8 +30,12 @@ object CaptureStore {
      * Save [bitmap] labelled with [correctPlate], recording what the app had read.
      * Returns null if writing failed — callers surface that rather than silently losing it.
      */
-    fun save(context: Context, bitmap: Bitmap, correctPlate: String, appRead: String): Saved? =
-        runCatching {
+    fun save(context: Context, bitmap: Bitmap, correctPlate: String, appRead: String): Saved? {
+        // A recycled bitmap throws from compress() *after* the file exists, which is how empty
+        // PNGs with no manifest row appeared. Refuse up front instead.
+        if (bitmap.isRecycled) return null
+        var created: File? = null
+        return runCatching {
             val dir = dir(context)
             // Same name pattern as the evaluation set: "154러7070_3.png". Suffix on collision so
             // repeat captures of one plate become separate cases instead of overwriting.
@@ -39,7 +43,10 @@ object CaptureStore {
             var file = File(dir, "$safe.png")
             var n = 1
             while (file.exists()) file = File(dir, "${safe}_$n.png").also { n++ }
-            FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            created = file
+            FileOutputStream(file).use {
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) { "compress failed" }
+            }
 
             val manifest = File(dir, MANIFEST)
             if (!manifest.exists()) {
@@ -51,7 +58,22 @@ object CaptureStore {
                 Charsets.UTF_8
             )
             Saved(file, count(context))
-        }.getOrNull()
+        }.getOrElse {
+            // Never leave a zero-byte PNG behind: it looks like a capture but has no manifest
+            // row, and it silently pollutes the evaluation set when the folder is pulled.
+            created?.delete()
+            null
+        }
+    }
+
+    /** Remove empty PNGs left by earlier failed saves. */
+    fun purgeEmpty(context: Context): Int {
+        val bad = dir(context).listFiles { f ->
+            f.extension.equals("png", true) && f.length() == 0L
+        } ?: return 0
+        bad.forEach { it.delete() }
+        return bad.size
+    }
 
     fun clear(context: Context) {
         dir(context).listFiles()?.forEach { it.delete() }

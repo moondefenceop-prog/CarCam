@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     @Volatile private var captureMode = false
     @Volatile private var lastFrame: android.graphics.Bitmap? = null
     @Volatile private var lastFrameRead = ""
+    @Volatile private var reportDialogOpen = false
 
     // 적응형 프레임 쓰로틀: 카메라가 주는 모든 프레임(보통 30fps)을 다 인식하면 발열/배터리
     // 부담이 크다. 번호판(또는 후보)이 보이는 동안은 ACTIVE 간격으로 빠르게 돌고, 한동안
@@ -151,9 +152,14 @@ class MainActivity : AppCompatActivity() {
                 lastFrameRead = ""
                 binding.btnReportWrong.isVisible = false
             }
+            val purged = if (checked) CaptureStore.purgeEmpty(this) else 0
             Snackbar.make(
                 binding.root,
-                if (checked) getString(R.string.captured_files, CaptureStore.count(this)) else "검증 캡처 꺼짐",
+                when {
+                    !checked -> "검증 캡처 꺼짐"
+                    purged > 0 -> "${getString(R.string.captured_files, CaptureStore.count(this))} (빈 파일 ${purged}개 정리)"
+                    else -> getString(R.string.captured_files, CaptureStore.count(this))
+                },
                 Snackbar.LENGTH_SHORT
             ).show()
         }
@@ -506,9 +512,14 @@ class MainActivity : AppCompatActivity() {
 
     @androidx.camera.core.ExperimentalGetImage
     private fun retainFrameForVerification(imageProxy: ImageProxy, rotation: Int, read: String) {
+        // While the correction dialog is open it holds this bitmap and the user is typing a
+        // label for *that* picture. Swapping it underneath would relabel a different frame.
+        if (reportDialogOpen) return
         val bmp = runCatching { ImageUtils.imageProxyToUprightBitmap(imageProxy, rotation) }.getOrNull()
             ?: return
-        lastFrame?.recycle()
+        // Deliberately not recycling the previous bitmap: the dialog may still be holding it,
+        // and compressing a recycled bitmap failed *after* creating the file, which is what
+        // left zero-byte captures behind. Dropping the reference is enough.
         lastFrame = bmp
         lastFrameRead = read
         runOnUiThread { binding.btnReportWrong.isVisible = true }
@@ -525,30 +536,48 @@ class MainActivity : AppCompatActivity() {
             Snackbar.make(binding.root, "저장할 프레임이 없습니다", Snackbar.LENGTH_SHORT).show()
             return
         }
+        val read = lastFrameRead
         val dialogBinding = DialogReportWrongBinding.inflate(LayoutInflater.from(this))
-        dialogBinding.tvAppRead.text = lastFrameRead.ifEmpty { "(없음)" }
-        dialogBinding.etCorrect.setText(lastFrameRead)
+        dialogBinding.tvAppRead.text = read.ifEmpty { "(없음)" }
+        dialogBinding.etCorrect.setText(read)
+        dialogBinding.ivPreview.setImageBitmap(frame)
         dialogBinding.tvCaptureCount.text = getString(R.string.captured_files, CaptureStore.count(this))
 
-        AlertDialog.Builder(this)
+        reportDialogOpen = true
+        val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.report_wrong)
             .setView(dialogBinding.root)
-            .setPositiveButton(R.string.save) { _, _ ->
-                val correct = dialogBinding.etCorrect.text?.toString()?.trim().orEmpty()
-                if (correct.isEmpty()) {
-                    Snackbar.make(binding.root, "정확한 번호판을 입력하세요", Snackbar.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                val saved = CaptureStore.save(this, frame, correct, lastFrameRead)
-                Snackbar.make(
-                    binding.root,
-                    if (saved != null) "저장됨 · ${getString(R.string.captured_files, saved.total)}"
-                    else "저장 실패",
-                    Snackbar.LENGTH_LONG
-                ).show()
-            }
+            .setPositiveButton(R.string.save, null)   // wired below so it can refuse to close
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+        dialog.setOnDismissListener { reportDialogOpen = false }
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val correct = dialogBinding.etCorrect.text?.toString()?.trim().orEmpty()
+                when {
+                    correct.isEmpty() ->
+                        Snackbar.make(binding.root, "정확한 번호판을 입력하세요", Snackbar.LENGTH_SHORT).show()
+                    // Saving the read back unchanged records no correction, and that is the
+                    // whole point of the capture — it happened on the first batch.
+                    correct == read ->
+                        Snackbar.make(
+                            binding.root, "앱이 읽은 값과 같습니다 — 정확한 번호로 고쳐주세요",
+                            Snackbar.LENGTH_LONG
+                        ).show()
+                    else -> {
+                        val saved = CaptureStore.save(this, frame, correct, read)
+                        Snackbar.make(
+                            binding.root,
+                            if (saved != null) "저장됨 · ${getString(R.string.captured_files, saved.total)}"
+                            else "저장 실패 (프레임이 이미 해제됨)",
+                            Snackbar.LENGTH_LONG
+                        ).show()
+                        dialog.dismiss()
+                    }
+                }
+            }
+        }
+        dialog.show()
     }
 
     private fun applyMode(mode: ParkingMode) {
