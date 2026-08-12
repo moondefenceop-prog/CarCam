@@ -15,7 +15,8 @@ import numpy as np, cv2
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from glyph_crop import snap_to_glyph, crop_for_model, binarize, trim_dark_background
+from glyph_crop import (snap_to_glyph, crop_for_model, binarize, trim_dark_background,
+                        hole_count, CLOSED_GLYPHS)
 from old_plate import locate_old_glyph, crop_old_glyph
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -37,7 +38,17 @@ def run_one(gray):
     g = (g - g.mean()) / (g.std() + 1e-6)
     itp.set_tensor(inp["index"], g.reshape(1, S, S, 1))
     itp.invoke()
-    p = itp.get_tensor(out["index"])[0]
+    p = itp.get_tensor(out["index"])[0].copy()
+    if os.environ.get("HOLE_VETO", "1") == "1":
+        # Veto characters whose consonant encloses a counter when the image plainly has none.
+        # This is a check on the picture, not a preference between classes: without it the
+        # model asserts strokes that are not there rather than admit an unfamiliar shape.
+        bwc = cv2.threshold(cv2.resize(gray, (S * 2, S * 2), interpolation=cv2.INTER_AREA),
+                            0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+        if hole_count(bwc) == 0:
+            for j, ch in enumerate(LABELS):
+                if ch in CLOSED_GLYPHS:
+                    p[j] = 0.0
     i = int(np.argmax(p))
     return LABELS[i], float(p[i])
 

@@ -58,6 +58,35 @@ def snap_to_glyph(gray, top, bot, cx, pitch):
     return L, R
 
 
+# Usage glyphs whose initial consonant encloses a counter: ㅁ, ㅂ, ㅇ, ㅎ. Everything else in
+# the 40-character set is open. A softmax over 40 classes cannot say "none of these", so on an
+# unfamiliar letterform it will happily assert a closed shape the image does not contain —
+# a clean 고 came back as 모 at 0.93. A hole is countable, so that assertion can be checked.
+CLOSED_GLYPHS = set("마머모무바버보부배아어오우하허호")
+
+
+def hole_count(binary, min_frac=0.012):
+    """Number of enclosed counters in a binarised glyph crop (dark strokes on light)."""
+    if binary is None or binary.size == 0:
+        return 0
+    ink = (binary < 128).astype(np.uint8)
+    if ink.sum() < 20:
+        return 0
+    # A one-pixel break in a stroke opens a counter, and blur can pinch one shut; close the
+    # mask slightly so the count reflects the shape rather than the sampling.
+    k = max(1, int(round(min(binary.shape) * 0.03)))
+    ink = cv2.morphologyEx(ink, cv2.MORPH_CLOSE, np.ones((k, k), np.uint8))
+    cnts, hier = cv2.findContours(ink, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    if hier is None:
+        return 0
+    area = float(ink.shape[0] * ink.shape[1])
+    n = 0
+    for i, h in enumerate(hier[0]):
+        if h[3] != -1 and cv2.contourArea(cnts[i]) >= area * min_frac:
+            n += 1                       # a child contour is a hole in its parent
+    return n
+
+
 def trim_dark_background(g, keep=0.55):
     """Drop rows of dark scene that sit outside the plate, above or below the glyph.
 

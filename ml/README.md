@@ -209,6 +209,23 @@ a ㅁ. All four model/binarisation combinations agree on 모 at 0.92-0.99, so th
 letterform, which no training asset covers — not a borderline call. Scored set is now 29/30
 (the two old plates joined the scored set, which was 28/28 over 28 images).
 
+## Hole veto: stopping the model asserting strokes that are not there (30/30)
+The one old-plate miss (`30고5445` → 모 at 0.93) survived every check: the crop was verified
+clean and complete at every preprocessing stage, the plate-font assets are correctly labelled
+(`rh`=고, `ah`=모), and all four model/binarisation combinations agreed on 모. The model was
+inventing the closed box of a ㅁ that the image plainly does not contain — a 40-way softmax has
+no way to say "none of these", so on an unfamiliar letterform it asserts the nearest shape
+instead of admitting the mismatch.
+
+A counter is countable, so the assertion can be checked against the image. Of the 40 usage
+characters, exactly 16 have an initial consonant that encloses a counter (ㅁ, ㅂ, ㅇ, ㅎ:
+마머모무 바버보부배 아어오우 하허호) and 24 are open. When the binarised crop contains no
+enclosed region, `hole_count` == 0 and those 16 classes are zeroed before the argmax.
+
+This is a check on the picture rather than a preference between classes, and it is
+self-validating: 머, 호, 바 and 아 stay correct throughout, which means the counter detection
+finds real holes where they exist. Scored set **30/30** (`HOLE_VETO=1`, default on).
+
 ## Files (extra)
 - `train_realfont.py` — trains on real plate-font glyph images + real digits (reject class).
   Requires `KOR_PLATE_REPO` env var or a `kor_plate/` clone of kade93/kor_license_plate_generator.
